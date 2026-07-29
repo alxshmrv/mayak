@@ -414,7 +414,7 @@ function DevicesView({ report, selectedDevice, onSelectedDevice, onTrustChange }
 function HistoryView({ entries, activeReport }: { entries: HistoryEntry[]; activeReport?: ScanReport }) {
   return (
     <div className="view-stack">
-      <div className="page-heading"><div><span className="eyebrow">Только на этом Mac</span><h1>История наблюдений</h1><p>
+      <div className="page-heading"><div><span className="eyebrow">Только на этом компьютере</span><h1>История наблюдений</h1><p>
         Сравнивайте знакомые сети и замечайте изменения точки доступа или состава устройств.
       </p></div></div>
       <section className="history-timeline">
@@ -471,7 +471,7 @@ function SettingsView({ settings, permissions, locationRequestAttempted, onSetti
           <input type="checkbox" className="switch" checked={settings.notifyNetworkChanges} onChange={(event) => patch("notifyNetworkChanges", event.target.checked)} /></label>
       </section>
       <section className="settings-group">
-        <div className="settings-group__heading"><MapPin aria-hidden="true" /><div><h2>Доступ macOS</h2><p>Геопозиция раскрывает только SSID/BSSID; сканирование работает без неё.</p></div></div>
+        <div className="settings-group__heading"><MapPin aria-hidden="true" /><div><h2>Системный доступ</h2><p>Геопозиция раскрывает только SSID/BSSID; сканирование работает без неё.</p></div></div>
         <div className="permission-row"><span><strong>Службы геолокации</strong><small>{permissionLabel(permissions.location)}</small></span>
           {permissions.location === "notDetermined" && !locationRequestAttempted ? <button type="button" className="secondary-button" onClick={onRequestLocation}>Разрешить</button>
             : permissions.location !== "allowed" ? <button type="button" className="secondary-button" onClick={() => void openPrivacySettings("location")}>Открыть настройки</button>
@@ -491,7 +491,7 @@ function LocationNotice({ state, requestAttempted, onRequestLocation, onOpenSett
   return (
     <aside className="permission-notice" aria-label="Имя Wi-Fi скрыто системой">
       <span className="permission-notice__icon"><MapPin aria-hidden="true" /></span>
-      <div><strong>{requestAttempted ? "Запрос отправлен в macOS" : "Имя Wi-Fi пока скрыто macOS"}</strong><p>
+      <div><strong>{requestAttempted ? "Запрос отправлен системе" : "Имя Wi-Fi пока скрыто системой"}</strong><p>
         {requestAttempted
           ? "Если системное окно не появилось, разрешите геопозицию в настройках. Сканирование уже работает."
           : "Проверка устройств уже работает. Доступ нужен только для SSID и BSSID; координаты Маяк не получает."}
@@ -639,7 +639,7 @@ export default function App() {
             notifyNewDevices: false,
             notifyNetworkChanges: false,
           };
-          setError("macOS не разрешила уведомления. Их можно включить позже в системных настройках.");
+          setError("Система не разрешила уведомления. Их можно включить позже в настройках.");
         }
       } catch (cause) {
         desired = {
@@ -667,9 +667,9 @@ export default function App() {
         setNotice("Имя текущей Wi-Fi-сети теперь доступно.");
         setLocationRequestAttempted(false);
       } else if (permissions.location === "denied" || permissions.location === "restricted") {
-        setNotice("Доступ отключён в macOS. Откройте системные настройки, чтобы изменить его.");
+        setNotice("Доступ отключён в системе. Откройте настройки, чтобы изменить его.");
       } else {
-        setNotice("Запрос отправлен. Если macOS не показала окно, нажмите «Открыть настройки».");
+        setNotice("Запрос отправлен. Если система не показала окно, нажмите «Открыть настройки».");
       }
       [800, 2_500, 6_000].forEach((delay) => window.setTimeout(() => void load(), delay));
       window.setTimeout(() => setNotice(undefined), 6_500);
@@ -711,7 +711,7 @@ export default function App() {
             </button>;
           })}
         </nav>
-        <div className="sidebar__network"><span className={snapshot.network.connected ? "is-online" : ""} /><div><small>{snapshot.network.connected ? "Сейчас в сети" : "Нет Wi-Fi"}</small><strong>{snapshot.network.ssid ?? (snapshot.network.connected ? "Имя скрыто macOS" : "Не подключено")}</strong></div></div>
+        <div className="sidebar__network"><span className={snapshot.network.connected ? "is-online" : ""} /><div><small>{snapshot.network.connected ? "Сейчас в сети" : "Нет Wi-Fi"}</small><strong>{snapshot.network.ssid ?? (snapshot.network.connected ? "Имя скрыто системой" : "Не подключено")}</strong></div></div>
         <Mascot mood={effectiveMascotMood} message={mascotMessage} />
       </aside>
       <main className="main-area">

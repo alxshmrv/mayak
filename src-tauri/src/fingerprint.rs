@@ -119,7 +119,7 @@ fn identity_key(raw: &RawDevice, mac: Option<&str>) -> String {
 
 fn display_name(raw: &RawDevice, kind: DeviceKind, vendor: Option<&str>) -> String {
     if raw.is_local_mac {
-        return "Этот Mac".to_owned();
+        return "Этот компьютер".to_owned();
     }
     if let Some(hostname) = raw.hostnames.iter().next() {
         return clean_hostname(hostname);

@@ -52,6 +52,7 @@ export const mockReport: ScanReport = {
     signalQuality: 86,
     transmitRateMbps: 780,
     countryCode: "RU",
+    localMacAddress: "02:00:00:00:00:02",
     ipv4: "10.42.18.37",
     ipv6: ["fe80::18a4:11ff:fe22:178a"],
     subnet: "10.42.18.0/24",
@@ -66,12 +67,12 @@ export const mockReport: ScanReport = {
       macAddress: "02:00:00:00:00:01",
       vendor: "Ubiquiti",
       openPorts: [80, 443],
-      evidence: ["Шлюз текущей Wi-Fi-сети", "MAC-адрес найден в ARP-таблице"],
+      evidence: ["Шлюз текущей Wi-Fi-сети", "MAC-адрес найден в таблице соседей (ARP)"],
     }),
-    device("local:mac", "Этот Mac", "computer", "10.42.18.37", {
+    device("local:computer", "Этот компьютер", "computer", "10.42.18.37", {
       trustState: "mine",
       macAddress: "02:00:00:00:00:02",
-      evidence: ["Локальный интерфейс этого Mac"],
+      evidence: ["Локальный интерфейс этого компьютера"],
     }),
     device("mac:tv", "Aurora Lounge TV", "media", "10.42.18.52", {
       vendor: "Samsung",
@@ -136,7 +137,7 @@ export const mockReport: ScanReport = {
         title: "Современная защита радиообмена",
         description:
           "Сеть использует WPA2/WPA3. Это защищает соединение с точкой доступа, но не делает локальную сеть доверенной.",
-        evidence: ["CoreWLAN: wpa2-wpa3-transition"],
+        evidence: ["Системный Wi-Fi API: wpa2-wpa3-transition"],
       },
       {
         id: "new-devices",

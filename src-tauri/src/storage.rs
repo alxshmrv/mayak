@@ -1,4 +1,5 @@
 use std::fs;
+#[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 
@@ -18,6 +19,7 @@ impl Storage {
     pub fn open(path: &Path) -> AppResult<Self> {
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent)?;
+            #[cfg(unix)]
             fs::set_permissions(parent, fs::Permissions::from_mode(0o700))?;
         }
 
@@ -495,6 +497,7 @@ mod tests {
                 signal_quality: None,
                 transmit_rate_mbps: None,
                 country_code: None,
+                local_mac_address: None,
                 ipv4: Some("192.168.1.20".to_owned()),
                 ipv6: Vec::new(),
                 subnet: Some("192.168.1.0/24".to_owned()),

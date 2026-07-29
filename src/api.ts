@@ -38,7 +38,7 @@ export async function runScan(mode: ScanMode): Promise<ScanReport> {
     {
       phase: "network",
       title: "Читаем параметры Wi-Fi",
-      detail: "CoreWLAN, маршруты и DNS",
+      detail: "Системный Wi-Fi API, маршруты и DNS",
       completed: 0,
       total: 1,
     },

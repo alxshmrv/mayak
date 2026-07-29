@@ -42,6 +42,7 @@ export interface NetworkContext {
   signalQuality?: number;
   transmitRateMbps?: number;
   countryCode?: string;
+  localMacAddress?: string;
   ipv4?: string;
   ipv6: string[];
   subnet?: string;

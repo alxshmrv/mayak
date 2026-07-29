@@ -15,7 +15,9 @@
 
 ## Локальный запуск
 
-Нужны macOS 15+, Xcode Command Line Tools, Rust 1.88+ и Node.js 22.12+.
+Нужны Rust 1.88+ и Node.js 22.12+. Для macOS также требуются macOS 15+ и Xcode
+Command Line Tools; для Windows — 64-битная Windows 10/11, Microsoft C++ Build
+Tools и WebView2.
 
 ```bash
 npm ci

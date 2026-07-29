@@ -1,15 +1,6 @@
-#![allow(
-    unsafe_code,
-    reason = "This module is the single reviewed FFI boundary to the CoreWLAN Objective-C bridge"
-)]
-
-use std::ffi::CStr;
-use std::os::raw::{c_char, c_int};
-
 use serde::Deserialize;
 
-use crate::domain::{ChannelInfo, PermissionState};
-use crate::error::{AppError, AppResult};
+use crate::domain::ChannelInfo;
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -28,6 +19,8 @@ pub struct NativeWifiSnapshot {
     #[serde(default)]
     pub noise: i64,
     #[serde(default)]
+    pub signal_quality: Option<u8>,
+    #[serde(default)]
     pub transmit_rate: f64,
     #[serde(default)]
     pub country_code: Option<String>,
@@ -44,66 +37,16 @@ fn unknown() -> String {
 }
 
 #[cfg(target_os = "macos")]
-unsafe extern "C" {
-    fn mayak_copy_wifi_json() -> *mut c_char;
-    fn mayak_free_string(value: *mut c_char);
-    fn mayak_request_location_permission();
-    fn mayak_location_authorization_status() -> c_int;
-}
-
+mod macos;
 #[cfg(target_os = "macos")]
-pub fn wifi_snapshot() -> AppResult<NativeWifiSnapshot> {
-    // SAFETY: The Objective-C bridge returns either null or a heap-allocated,
-    // NUL-terminated UTF-8 JSON string owned by the caller.
-    let pointer = unsafe { mayak_copy_wifi_json() };
-    if pointer.is_null() {
-        return Err(AppError::Platform(
-            "CoreWLAN не вернул данные Wi‑Fi".to_owned(),
-        ));
-    }
+pub use macos::{location_permission_state, request_location_permission, wifi_snapshot};
 
-    // SAFETY: `pointer` was checked for null and the bridge guarantees a
-    // NUL-terminated byte string that stays valid until `mayak_free_string`.
-    let bytes = unsafe { CStr::from_ptr(pointer) }.to_bytes().to_vec();
+#[cfg(windows)]
+mod windows;
+#[cfg(windows)]
+pub use windows::{location_permission_state, request_location_permission, wifi_snapshot};
 
-    // SAFETY: The pointer was allocated by `mayak_copy_wifi_json`, has not
-    // been freed yet, and is released exactly once by its matching function.
-    unsafe { mayak_free_string(pointer) };
-
-    let value = serde_json::from_slice(&bytes)?;
-    Ok(value)
-}
-
-#[cfg(not(target_os = "macos"))]
-pub fn wifi_snapshot() -> AppResult<NativeWifiSnapshot> {
-    Err(AppError::Platform(
-        "CoreWLAN доступен только на macOS".to_owned(),
-    ))
-}
-
-#[cfg(target_os = "macos")]
-pub fn request_location_permission() {
-    // SAFETY: The bridge takes no pointers and schedules the CoreLocation
-    // request on the main dispatch queue.
-    unsafe { mayak_request_location_permission() };
-}
-
-#[cfg(not(target_os = "macos"))]
-pub fn request_location_permission() {}
-
-#[cfg(target_os = "macos")]
-pub fn location_permission_state() -> PermissionState {
-    // SAFETY: The bridge returns a scalar CLAuthorizationStatus value.
-    match unsafe { mayak_location_authorization_status() } {
-        0 => PermissionState::NotDetermined,
-        1 => PermissionState::Restricted,
-        2 => PermissionState::Denied,
-        3 | 4 => PermissionState::Allowed,
-        _ => PermissionState::Unknown,
-    }
-}
-
-#[cfg(not(target_os = "macos"))]
-pub fn location_permission_state() -> PermissionState {
-    PermissionState::Unknown
-}
+#[cfg(not(any(target_os = "macos", windows)))]
+mod unsupported;
+#[cfg(not(any(target_os = "macos", windows)))]
+pub use unsupported::{location_permission_state, request_location_permission, wifi_snapshot};

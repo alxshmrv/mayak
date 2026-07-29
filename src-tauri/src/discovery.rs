@@ -1,7 +1,6 @@
 use std::collections::BTreeMap;
 use std::io::ErrorKind;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-use std::process::Command;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -22,6 +21,7 @@ use crate::domain::{
 use crate::error::{AppError, AppResult};
 use crate::fingerprint::{RawDevice, finalize_device};
 use crate::network::selected_ipv4;
+use crate::platform;
 
 pub struct DiscoveryOutput {
     pub devices: Vec<ObservedDevice>,
@@ -112,12 +112,8 @@ pub async fn discover(
     local.is_local_mac = true;
     local
         .evidence
-        .insert("Локальный интерфейс этого Mac".to_owned());
-    if let Some(interface) = context.interface_name.as_deref()
-        && let Some(mac) = read_interface_mac(interface)
-    {
-        local.mac_address = Some(mac);
-    }
+        .insert("Локальный интерфейс этого компьютера".to_owned());
+    local.mac_address.clone_from(&context.local_mac_address);
     merged
         .entry(local_ip)
         .and_modify(|existing| existing.merge(local.clone()))
@@ -380,44 +376,17 @@ async fn probe_host(
 }
 
 fn read_arp_table(interface_name: Option<&str>) -> Vec<RawDevice> {
-    let Some(output) = Command::new("/usr/sbin/arp")
-        .arg("-an")
-        .output()
-        .ok()
-        .filter(|value| value.status.success())
-    else {
-        return Vec::new();
-    };
-    parse_arp_table(&String::from_utf8_lossy(&output.stdout), interface_name)
-}
-
-fn parse_arp_table(output: &str, interface_name: Option<&str>) -> Vec<RawDevice> {
-    let Ok(pattern) = Regex::new(
-        r"\((?P<ip>\d{1,3}(?:\.\d{1,3}){3})\)\s+at\s+(?P<mac>[0-9a-fA-F:]{11,17})\s+on\s+(?P<interface>\S+)",
-    ) else {
-        return Vec::new();
-    };
-
-    pattern
-        .captures_iter(output)
-        .filter(|capture| {
-            interface_name.is_none_or(|expected| {
-                capture
-                    .name("interface")
-                    .is_some_and(|value| value.as_str() == expected)
-            })
-        })
-        .filter_map(|capture| {
-            let ip = capture.name("ip")?.as_str().parse::<Ipv4Addr>().ok()?;
-            let mac = capture.name("mac")?.as_str().to_owned();
-            if is_group_mac(&mac) {
+    platform::read_neighbors(interface_name)
+        .into_iter()
+        .filter_map(|neighbor| {
+            if is_group_mac(&neighbor.mac_address) {
                 return None;
             }
-            let mut record = RawDevice::new(ip);
-            record.mac_address = Some(mac);
+            let mut record = RawDevice::new(neighbor.ip);
+            record.mac_address = Some(neighbor.mac_address);
             record
                 .evidence
-                .insert("MAC-адрес найден в ARP-таблице".to_owned());
+                .insert("MAC-адрес найден в таблице соседей (ARP)".to_owned());
             Some(record)
         })
         .collect()
@@ -426,15 +395,7 @@ fn parse_arp_table(output: &str, interface_name: Option<&str>) -> Vec<RawDevice>
 fn resolve_local_dns(ips: Vec<Ipv4Addr>) -> Vec<RawDevice> {
     ips.into_iter()
         .filter_map(|ip| {
-            let output = Command::new("/usr/bin/dscacheutil")
-                .args(["-q", "host", "-a", "ip_address"])
-                .arg(ip.to_string())
-                .output()
-                .ok()?;
-            if !output.status.success() {
-                return None;
-            }
-            let hostname = parse_dscacheutil_hostname(&String::from_utf8_lossy(&output.stdout))?;
+            let hostname = platform::resolve_hostname(ip)?;
             let mut record = RawDevice::new(ip);
             record.hostnames.insert(hostname);
             record
@@ -443,29 +404,6 @@ fn resolve_local_dns(ips: Vec<Ipv4Addr>) -> Vec<RawDevice> {
             Some(record)
         })
         .collect()
-}
-
-fn parse_dscacheutil_hostname(output: &str) -> Option<String> {
-    output.lines().find_map(|line| {
-        let value = line.trim().strip_prefix("name:")?.trim();
-        (!value.is_empty()
-            && value.parse::<Ipv4Addr>().is_err()
-            && !value.ends_with(".in-addr.arpa"))
-        .then(|| value.to_owned())
-    })
-}
-
-fn read_interface_mac(interface_name: &str) -> Option<String> {
-    let output = Command::new("/sbin/ifconfig")
-        .arg(interface_name)
-        .output()
-        .ok()?;
-    if !output.status.success() {
-        return None;
-    }
-    String::from_utf8_lossy(&output.stdout)
-        .lines()
-        .find_map(|line| line.trim().strip_prefix("ether ").map(str::to_owned))
 }
 
 fn discover_mdns(duration: Duration) -> Vec<RawDevice> {
@@ -750,10 +688,7 @@ mod tests {
 
     use ipnet::Ipv4Net;
 
-    use super::{
-        RawDevice, extract_onvif_addresses, is_valid_observation, parse_arp_table,
-        parse_dscacheutil_hostname, scan_targets,
-    };
+    use super::{RawDevice, extract_onvif_addresses, is_valid_observation, scan_targets};
 
     #[test]
     fn safe_scan_covers_a_whole_slash_24() {
@@ -775,42 +710,10 @@ mod tests {
     }
 
     #[test]
-    fn parses_only_selected_interface_arp_entries() {
-        let output = "\
-? (192.168.1.1) at aa:bb:cc:dd:ee:ff on en0 ifscope [ethernet]\n\
-? (10.0.0.1) at 00:11:22:33:44:55 on utun4 ifscope [ethernet]\n";
-        let records = parse_arp_table(output, Some("en0"));
-        assert_eq!(records.len(), 1);
-        assert_eq!(records[0].ip, Ipv4Addr::new(192, 168, 1, 1));
-    }
-
-    #[test]
-    fn ignores_broadcast_arp_entries() {
-        let output = "\
-? (192.168.1.20) at aa:bb:cc:dd:ee:ff on en0 ifscope [ethernet]\n\
-? (192.168.1.255) at ff:ff:ff:ff:ff:ff on en0 ifscope [ethernet]\n";
-        let records = parse_arp_table(output, Some("en0"));
-        assert_eq!(records.len(), 1);
-        assert_eq!(records[0].ip, Ipv4Addr::new(192, 168, 1, 20));
-    }
-
-    #[test]
     fn subnet_broadcast_is_not_a_device() {
         let subnet: Ipv4Net = "192.0.2.0/24".parse().expect("valid subnet");
         let broadcast = RawDevice::new(Ipv4Addr::new(192, 0, 2, 255));
         assert!(!is_valid_observation(&broadcast, subnet));
-    }
-
-    #[test]
-    fn parses_router_provided_reverse_dns_name() {
-        let output = "\
-name: printer-lab\n\
-alias: 189.2.0.192.in-addr.arpa\n\
-ip_address: 192.0.2.189\n";
-        assert_eq!(
-            parse_dscacheutil_hostname(output).as_deref(),
-            Some("printer-lab")
-        );
     }
 
     #[test]
