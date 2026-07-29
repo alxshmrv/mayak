@@ -74,8 +74,7 @@ pub fn location_permission_state() -> PermissionState {
         {
             PermissionState::Allowed
         }
-        Ok(_) => PermissionState::Unknown,
-        Err(_) => PermissionState::Unknown,
+        Ok(_) | Err(_) => PermissionState::Unknown,
     }
 }
 
@@ -141,7 +140,7 @@ fn observe_wifi() -> AppResult<WifiObservation> {
             interface_name,
             power_on: true,
             ssid: ssid(&association.dot11Ssid),
-            bssid: mac_address(&association.dot11Bssid),
+            bssid: mac_address(association.dot11Bssid),
             rssi: approximate_rssi,
             noise: 0,
             signal_quality,
@@ -194,8 +193,8 @@ fn open_wlan_handle() -> AppResult<WlanHandle> {
         WlanOpenHandle(
             WLAN_API_VERSION_2_0,
             None,
-            &mut negotiated_version,
-            &mut handle,
+            &raw mut negotiated_version,
+            &raw mut handle,
         )
     };
     if code == 0 {
@@ -211,7 +210,7 @@ fn enumerate_interfaces(handle: &WlanHandle) -> AppResult<(Vec<WLAN_INTERFACE_IN
     let mut pointer = null_mut::<WLAN_INTERFACE_INFO_LIST>();
     // SAFETY: `pointer` is a valid output location. The returned allocation is
     // immediately placed under `WlanMemory` ownership.
-    let code = unsafe { WlanEnumInterfaces(handle.0, None, &mut pointer) };
+    let code = unsafe { WlanEnumInterfaces(handle.0, None, &raw mut pointer) };
     if code != 0 {
         return Err(AppError::Platform(format!(
             "Не удалось перечислить Wi‑Fi-интерфейсы Windows: ошибка {code}"
@@ -247,8 +246,8 @@ fn query_interface<T: Copy>(
             interface_guid,
             opcode,
             None,
-            &mut size,
-            &mut pointer,
+            &raw mut size,
+            &raw mut pointer,
             None,
         )
     };
@@ -278,11 +277,11 @@ fn current_bss(
         WlanGetNetworkBssList(
             handle.0,
             interface_guid,
-            Some(&association.dot11Ssid),
+            Some(&raw const association.dot11Ssid),
             association.dot11BssType,
             connection.wlanSecurityAttributes.bSecurityEnabled.as_bool(),
             None,
-            &mut pointer,
+            &raw mut pointer,
         )
     };
     if code != 0 || pointer.is_null() {
@@ -327,7 +326,7 @@ fn ssid(value: &::windows::Win32::NetworkManagement::WiFi::DOT11_SSID) -> Option
     (!bytes.is_empty()).then(|| String::from_utf8_lossy(bytes).into_owned())
 }
 
-fn mac_address(value: &[u8; 6]) -> Option<String> {
+fn mac_address(value: [u8; 6]) -> Option<String> {
     value.iter().any(|octet| *octet != 0).then(|| {
         value
             .iter()
@@ -355,8 +354,7 @@ fn security_name(
         1 => "open",
         2 => "wep",
         3 => "wpa-enterprise",
-        4 => "wpa-personal",
-        5 => "wpa-personal",
+        4 | 5 => "wpa-personal",
         6 => "wpa2-enterprise",
         7 => "wpa2-personal",
         8 | 11 => "wpa3-enterprise",
@@ -420,7 +418,7 @@ mod tests {
     #[test]
     fn formats_bssid_and_band() {
         assert_eq!(
-            mac_address(&[0x10, 0x20, 0x30, 0x40, 0x50, 0x60]).as_deref(),
+            mac_address([0x10, 0x20, 0x30, 0x40, 0x50, 0x60]).as_deref(),
             Some("10:20:30:40:50:60")
         );
         assert_eq!(channel_band(Some(5_180), 36), "5 ГГц");

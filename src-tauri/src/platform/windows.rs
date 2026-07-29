@@ -49,7 +49,7 @@ impl WinsockSession {
         let mut data = WSADATA::default();
         // SAFETY: `data` is valid output storage and version 2.2 is supported
         // by all Windows versions supported by Tauri 2.
-        (unsafe { WSAStartup(0x0202, &mut data) } == 0).then_some(Self)
+        (unsafe { WSAStartup(0x0202, &raw mut data) } == 0).then_some(Self)
     }
 }
 
@@ -65,9 +65,7 @@ impl Drop for WinsockSession {
 
 pub fn network_facts(interface_name: &str, interface_index: Option<u32>) -> SystemNetworkFacts {
     let index = interface_index.or_else(|| interface_index_by_name(interface_name));
-    let mut facts = index
-        .and_then(adapter_facts)
-        .unwrap_or_else(SystemNetworkFacts::default);
+    let mut facts = index.and_then(adapter_facts).unwrap_or_default();
     facts.proxy_enabled = read_proxy_enabled();
     facts
 }
@@ -77,7 +75,7 @@ pub fn read_neighbors(interface_name: Option<&str>) -> Vec<NeighborEntry> {
     let mut pointer = null_mut::<MIB_IPNET_TABLE2>();
     // SAFETY: `pointer` is valid output storage. A successful call transfers
     // an IP Helper allocation that is immediately owned by `MibMemory`.
-    let result = unsafe { GetIpNetTable2(AF_INET, &mut pointer) };
+    let result = unsafe { GetIpNetTable2(AF_INET, &raw mut pointer) };
     if result != NO_ERROR || pointer.is_null() {
         return Vec::new();
     }
@@ -227,7 +225,7 @@ fn adapter_buffer() -> Option<Vec<u64>> {
                 ::windows::Win32::NetworkManagement::IpHelper::GET_ADAPTERS_ADDRESSES_FLAGS(flags),
                 None,
                 Some(buffer.as_mut_ptr().cast()),
-                &mut bytes,
+                &raw mut bytes,
             )
         };
         if result == ERROR_SUCCESS.0 {
@@ -313,14 +311,18 @@ fn socket_address_ip(address: SOCKET_ADDRESS) -> Option<IpAddr> {
         && usize::try_from(address.iSockaddrLength).ok()? >= size_of::<SOCKADDR_IN>()
     {
         // SAFETY: The address family and size establish the concrete layout.
-        let socket = unsafe { &*address.lpSockaddr.cast::<SOCKADDR_IN>() };
+        // `read_unaligned` avoids relying on the weaker alignment expressed
+        // by the generic `SOCKADDR` pointer type.
+        let socket = unsafe { address.lpSockaddr.cast::<SOCKADDR_IN>().read_unaligned() };
         return Some(IpAddr::V4(ipv4_from_in_addr(socket.sin_addr)));
     }
     if family == AF_INET6
         && usize::try_from(address.iSockaddrLength).ok()? >= size_of::<SOCKADDR_IN6>()
     {
         // SAFETY: The address family and size establish the concrete layout.
-        let socket = unsafe { &*address.lpSockaddr.cast::<SOCKADDR_IN6>() };
+        // `read_unaligned` avoids relying on the weaker alignment expressed
+        // by the generic `SOCKADDR` pointer type.
+        let socket = unsafe { address.lpSockaddr.cast::<SOCKADDR_IN6>().read_unaligned() };
         // SAFETY: `AF_INET6` establishes the active byte representation of
         // the initialized `IN6_ADDR` union.
         let bytes = unsafe { socket.sin6_addr.u.Byte };
