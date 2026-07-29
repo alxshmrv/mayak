@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>NSLocationUsageDescription</key>
+  <string>Маяку нужен доступ к геопозиции только потому, что macOS скрывает без него имя и идентификатор Wi‑Fi. Координаты не запрашиваются и не сохраняются.</string>
+  <key>NSLocationWhenInUseUsageDescription</key>
+  <string>Маяку нужен доступ, чтобы показать имя и идентификатор текущей Wi‑Fi-сети. Координаты не запрашиваются и не сохраняются.</string>
+  <key>NSLocalNetworkUsageDescription</key>
+  <string>Маяк безопасно ищет устройства только в текущей локальной сети и объясняет, какие из них удалось наблюдать.</string>
+  <key>NSBonjourServices</key>
+  <array>
+    <string>_services._dns-sd._udp</string>
+    <string>_http._tcp</string>
+    <string>_https._tcp</string>
+    <string>_workstation._tcp</string>
+    <string>_device-info._tcp</string>
+    <string>_airplay._tcp</string>
+    <string>_raop._tcp</string>
+    <string>_googlecast._tcp</string>
+    <string>_ipp._tcp</string>
+    <string>_ipps._tcp</string>
+    <string>_printer._tcp</string>
+    <string>_scanner._tcp</string>
+    <string>_smb._tcp</string>
+    <string>_ssh._tcp</string>
+    <string>_rtsp._tcp</string>
+    <string>_hap._tcp</string>
+  </array>
+</dict>
+</plist>

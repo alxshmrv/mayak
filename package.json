@@ -1,0 +1,54 @@
+{
+  "name": "mayak",
+  "private": true,
+  "version": "0.1.4",
+  "description": "Локальный центр доверия к Wi-Fi для macOS",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/alxshmrv/mayak.git"
+  },
+  "homepage": "https://github.com/alxshmrv/mayak#readme",
+  "bugs": {
+    "url": "https://github.com/alxshmrv/mayak/issues"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint . --max-warnings 0",
+    "tauri": "tauri",
+    "check": "npm run lint && npm run test && npm run build"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.11.1",
+    "lucide-react": "^0.468.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@tauri-apps/cli": "^2.11.4",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.0",
+    "@types/node": "^24.10.1",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.1",
+    "eslint": "^10.8.0",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.5.3",
+    "globals": "^16.5.0",
+    "jsdom": "^27.2.0",
+    "typescript": "^6.0.1",
+    "typescript-eslint": "^8.48.1",
+    "vite": "^8.1.5",
+    "vitest": "^4.0.15"
+  }
+}

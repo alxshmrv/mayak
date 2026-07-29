@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Сообщить об уязвимости
+    url: https://github.com/alxshmrv/mayak/security/advisories/new
+    about: Приватный канал для деталей уязвимости

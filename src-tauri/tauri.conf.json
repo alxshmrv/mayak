@@ -1,0 +1,55 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "Маяк",
+  "version": "0.1.4",
+  "identifier": "app.mayak.network",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "macOSPrivateApi": false,
+    "windows": [
+      {
+        "label": "main",
+        "title": "Маяк",
+        "width": 1240,
+        "height": 780,
+        "minWidth": 980,
+        "minHeight": 640,
+        "center": true,
+        "resizable": true,
+        "fullscreen": false,
+        "visible": true,
+        "decorations": true,
+        "transparent": false,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "acceptFirstMouse": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; connect-src ipc: http://ipc.localhost; img-src 'self' asset: data:; style-src 'self' 'unsafe-inline'; font-src 'self'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["app", "dmg"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "category": "Utility",
+    "shortDescription": "Проверка безопасности Wi-Fi и видимых устройств",
+    "longDescription": "Маяк показывает параметры текущей Wi-Fi-сети, безопасно обнаруживает доступные устройства и объясняет риски без отправки данных в облако.",
+    "macOS": {
+      "minimumSystemVersion": "15.0",
+      "signingIdentity": "-"
+    }
+  }
+}

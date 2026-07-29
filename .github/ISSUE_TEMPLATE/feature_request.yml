@@ -1,0 +1,24 @@
+name: Предложение
+description: Предложить улучшение Маяка
+title: "[Feature]: "
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Какую проблему решает предложение?
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Как должно работать решение?
+    validations:
+      required: true
+  - type: textarea
+    id: safety
+    attributes:
+      label: Влияние на приватность и безопасность
+      description: Какие новые данные, разрешения или сетевые запросы потребуются?
+    validations:
+      required: true

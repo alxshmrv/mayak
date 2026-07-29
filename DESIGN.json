@@ -1,0 +1,125 @@
+{
+  "schemaVersion": 2,
+  "name": "Mayak",
+  "version": "1.0.0",
+  "generatedAt": "2026-07-29T12:48:00+05:00",
+  "northStar": "Спокойная радиолаборатория",
+  "narrative": {
+    "personality": ["спокойный", "точный", "защищающий"],
+    "signature": "Функциональная топология с тихим радарным движением и живой краб в углу.",
+    "informationOrder": ["вывод", "причина", "доказательства", "полные параметры"]
+  },
+  "tokens": {
+    "colors": {
+      "canvas": "#f4f5f8",
+      "surface": "#ffffff",
+      "ink": "#171923",
+      "inkSoft": "#555b6f",
+      "inkFaint": "#858a9b",
+      "iris": "#5e56cf",
+      "irisDeep": "#443ba7",
+      "irisSoft": "#ebeafd",
+      "green": "#248566",
+      "greenSoft": "#e4f5ef",
+      "amber": "#a96218",
+      "amberSoft": "#fff1da",
+      "red": "#be3f4c",
+      "redSoft": "#fee9eb",
+      "coral": "#df694e"
+    },
+    "tonalRamps": {
+      "iris": ["#f5f4ff", "#ebeafd", "#c9c5f6", "#7972e5", "#5e56cf", "#443ba7", "#302873"],
+      "neutral": ["#ffffff", "#f4f5f8", "#eef0f5", "#c9ccd5", "#858a9b", "#555b6f", "#171923"],
+      "success": ["#f3fbf8", "#e4f5ef", "#69b79d", "#248566", "#175b47"],
+      "warning": ["#fff9ef", "#fff1da", "#d39246", "#a96218", "#73400f"],
+      "danger": ["#fff5f6", "#fee9eb", "#df7b84", "#be3f4c", "#812b34"]
+    },
+    "spacing": {
+      "1": "4px",
+      "2": "8px",
+      "3": "12px",
+      "4": "16px",
+      "6": "24px",
+      "8": "32px"
+    },
+    "radii": {
+      "small": "9px",
+      "control": "10px",
+      "section": "16px",
+      "hero": "24px",
+      "pill": "999px"
+    },
+    "typography": {
+      "family": "-apple-system, BlinkMacSystemFont, SF Pro Display, Segoe UI, sans-serif",
+      "display": {"size": "30px", "lineHeight": "1.08", "weight": 700, "letterSpacing": "-0.035em"},
+      "headline": {"size": "18px", "lineHeight": "1.22", "weight": 700, "letterSpacing": "-0.015em"},
+      "title": {"size": "13px", "lineHeight": "1.2", "weight": 650},
+      "body": {"size": "14px", "lineHeight": "1.45", "weight": 400},
+      "label": {"size": "10px", "lineHeight": "1.2", "weight": 750, "letterSpacing": "0.11em"}
+    },
+    "shadows": {
+      "small": "0 1px 2px rgba(20, 22, 33, 0.05)",
+      "medium": "0 18px 48px rgba(30, 31, 48, 0.08), 0 2px 8px rgba(30, 31, 48, 0.05)"
+    },
+    "motion": {
+      "fast": "140ms ease",
+      "normal": "220ms ease",
+      "ambient": "8000ms linear",
+      "reducedMotion": "disable all nonessential animation"
+    },
+    "breakpoints": {
+      "compactNavigation": "1050px",
+      "stackedHero": "1080px"
+    }
+  },
+  "components": [
+    {
+      "name": "ds-primary-button",
+      "role": "Основное действие",
+      "css": "background:#5e56cf;color:#fff;border:0;border-radius:10px;font-weight:700;min-height:34px"
+    },
+    {
+      "name": "ds-secondary-button",
+      "role": "Вторичное действие",
+      "css": "background:rgba(255,255,255,.82);color:#555b6f;border:1px solid rgba(48,51,69,.12);border-radius:10px"
+    },
+    {
+      "name": "ds-nav-item",
+      "role": "Навигация разделов",
+      "css": "display:grid;grid-template-columns:22px 1fr auto;gap:8px;padding:9px 10px;border-radius:10px"
+    },
+    {
+      "name": "ds-status-pill",
+      "role": "Семантический статус",
+      "css": "display:inline-flex;gap:5px;padding:5px 9px;border:1px solid currentColor;border-radius:999px;font-size:10px;font-weight:750"
+    },
+    {
+      "name": "ds-network-hero",
+      "role": "Главный вывод и топология",
+      "css": "display:grid;grid-template-columns:minmax(320px,.9fr) minmax(410px,1.1fr);border:1px solid rgba(48,51,69,.12);border-radius:24px"
+    },
+    {
+      "name": "ds-device-row",
+      "role": "Устройство с раскрываемыми доказательствами",
+      "css": "display:grid;grid-template-columns:minmax(180px,1.4fr) 1fr 1fr auto;align-items:center;gap:16px"
+    },
+    {
+      "name": "ds-mascot",
+      "role": "Живой индикатор состояния",
+      "states": ["idle", "peek", "scuttle", "scan", "wave", "concerned"],
+      "constraints": ["не перекрывает управление", "отключает движение при prefers-reduced-motion"]
+    }
+  ],
+  "dos": [
+    "Показывать вывод перед доказательствами",
+    "Отделять риск, видимость и уверенность",
+    "Дублировать цвет текстом или иконкой",
+    "Сохранять технические данные доступными"
+  ],
+  "donts": [
+    "Не использовать хакерский неон и терминальные клише",
+    "Не обещать, что ненайденной камеры не существует",
+    "Не превращать всё содержимое в одинаковые карточки",
+    "Не вводить новые акцентные цвета без семантической роли"
+  ]
+}

@@ -1,0 +1,50 @@
+name: Ошибка
+description: Сообщить о воспроизводимой проблеме в Маяке
+title: "[Bug]: "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Не публикуйте реальные SSID, BSSID, IP, MAC, имена устройств или базы данных.
+        Для уязвимостей используйте приватный security advisory.
+  - type: input
+    id: version
+    attributes:
+      label: Версия Маяка
+      placeholder: 0.1.4
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: Версия macOS и модель Mac
+      placeholder: macOS 15.x, MacBook Pro M3
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Шаги воспроизведения
+      description: Используйте вымышленные или замаскированные сетевые данные.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Ожидаемое поведение
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Фактическое поведение
+    validations:
+      required: true
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Приватность
+      options:
+        - label: Я удалил(а) реальные сетевые и персональные данные из отчёта.
+          required: true

@@ -1,0 +1,45 @@
+[package]
+name = "mayak"
+version = "0.1.4"
+description = "Локальный центр доверия к Wi-Fi для macOS"
+authors = ["Mayak contributors"]
+license = "MIT"
+repository = "https://github.com/alxshmrv/mayak"
+edition = "2024"
+rust-version = "1.88"
+
+[lib]
+name = "mayak_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+cc = "1.2"
+tauri-build = { version = "2.5", features = [] }
+
+[dependencies]
+chrono = { version = "0.4", features = ["serde"] }
+futures = "0.3"
+if-addrs = "0.15"
+ipnet = "2.12"
+mdns-sd = "0.20"
+parking_lot = "0.12"
+regex = "1.12"
+rusqlite = { version = "0.40", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+tauri = { version = "2.11", features = ["tray-icon"] }
+tauri-plugin-notification = "2"
+thiserror = "2"
+tokio = { version = "1.49", features = ["macros", "net", "rt-multi-thread", "sync", "time"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+url = "2.5"
+uuid = { version = "1.19", features = ["serde", "v4"] }
+
+[lints.rust]
+unsafe_code = "warn"
+
+[lints.clippy]
+all = "warn"
+pedantic = "warn"
