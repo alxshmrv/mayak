@@ -21,6 +21,9 @@
 
 - версия следующего выпуска повышена до 0.3.0;
 - release workflow использует закреплённый commit официального Tauri Action;
+- Windows PR CI параллелит lint и тесты, переиспользует Rust-артефакты и
+  быстрый debug installer smoke, сохраняя полноценную release-сборку после
+  слияния в `main`;
 - будущие updater-релизы публикуются как обычные GitHub Releases, чтобы
   стабильный HTTPS endpoint `/releases/latest/` всегда указывал на полный
   подписанный манифест.
