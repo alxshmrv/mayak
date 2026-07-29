@@ -1,6 +1,6 @@
 [package]
 name = "mayak"
-version = "0.2.0"
+version = "0.3.0"
 description = "Локальный центр доверия к Wi-Fi для macOS и Windows"
 authors = ["Mayak contributors"]
 license = "MIT"
@@ -30,6 +30,8 @@ serde_json = "1"
 sha2 = "0.10"
 tauri = { version = "2.11", features = ["tray-icon"] }
 tauri-plugin-notification = "2"
+tauri-plugin-process = "2.3.1"
+tauri-plugin-updater = "2.10.1"
 thiserror = "2"
 tokio = { version = "1.49", features = ["macros", "net", "rt-multi-thread", "sync", "time"] }
 tracing = "0.1"

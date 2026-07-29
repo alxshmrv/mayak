@@ -1,7 +1,7 @@
 {
   "name": "mayak",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Локальный центр доверия к Wi-Fi для macOS и Windows",
   "license": "MIT",
   "repository": {
@@ -21,13 +21,16 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test": "vitest run",
+    "test:release": "node --test scripts/*.test.mjs",
     "test:watch": "vitest",
     "lint": "eslint . --max-warnings 0",
     "tauri": "tauri",
-    "check": "npm run lint && npm run test && npm run build"
+    "check": "npm run lint && npm run test && npm run test:release && npm run build"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.11.1",
+    "@tauri-apps/plugin-process": "^2.3.1",
+    "@tauri-apps/plugin-updater": "^2.10.1",
     "lucide-react": "^0.468.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"

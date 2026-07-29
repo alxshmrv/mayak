@@ -15,11 +15,13 @@ MIT, но эта лицензия не заменяет лицензии зав�
 | --- | --- | --- |
 | React / React DOM | интерфейс | MIT |
 | Tauri | desktop runtime и API | Apache-2.0 OR MIT |
+| Tauri Updater / Process plugins | подписанные обновления и перезапуск | Apache-2.0 OR MIT |
 | Lucide React | интерфейсные иконки | ISC |
 | Tokio | асинхронный runtime | MIT |
 | rusqlite / SQLite | локальное хранилище | MIT / Public Domain |
 | mdns-sd | локальное обнаружение | MIT OR Apache-2.0 |
 | windows-rs | Windows Native Wi-Fi, IP Helper и системные API | MIT OR Apache-2.0 |
+| minisign-verify / rustls | проверка подписи и TLS обновлений | MIT OR Apache-2.0 / Apache-2.0 OR ISC OR MIT |
 
 `windows-rs` входит только в Windows-сборку. CoreWLAN, CoreLocation и другие
 Apple frameworks являются системными компонентами macOS и не поставляются

@@ -1,9 +1,9 @@
 import {
   Activity, AlertTriangle, Bell, Bookmark, Camera, Check, ChevronDown,
   ChevronRight, CircleCheck, CircleHelp, Clock3, Eye, Gauge, History, Info,
-  Laptop, Lock, MapPin, Network, Printer, Radar, Radio, RefreshCw, Router,
-  Search, Settings, ShieldCheck, Signal, SlidersHorizontal, Smartphone, Tablet,
-  Tv, UserCheck, Wifi, X, type LucideIcon,
+  Download, Laptop, Lock, MapPin, Network, Printer, Radar, Radio, RefreshCw,
+  Router, Search, Settings, ShieldCheck, Signal, SlidersHorizontal, Smartphone,
+  Tablet, Tv, UserCheck, Wifi, X, type LucideIcon,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import {
@@ -17,6 +17,7 @@ import type {
   ObservedDevice, PermissionState, ScanMode, ScanProgress, ScanReport, Severity,
   TrustState, VisibilityLevel,
 } from "./types";
+import { useAppUpdater, type AppUpdateState } from "./useAppUpdater";
 
 type View = "overview" | "devices" | "history" | "settings";
 type MascotMood = "idle" | "peek" | "scuttle" | "scan" | "wave" | "concerned";
@@ -76,6 +77,12 @@ function formatDate(value: string, withDate = false) {
 function formatDuration(ms: number) {
   if (ms < 1_000) return `${ms} мс`;
   return `${(ms / 1_000).toFixed(1).replace(".", ",")} с`;
+}
+
+function formatBytes(value: number) {
+  if (value < 1_024) return `${value} Б`;
+  if (value < 1_048_576) return `${Math.round(value / 1_024)} КБ`;
+  return `${(value / 1_048_576).toFixed(1).replace(".", ",")} МБ`;
 }
 
 function normalizeSecurity(value: string) {
@@ -440,9 +447,51 @@ function HistoryView({ entries, activeReport }: { entries: HistoryEntry[]; activ
   );
 }
 
-function SettingsView({ settings, permissions, locationRequestAttempted, onSettingsChange, onRequestLocation }: {
+function UpdateSettings({ update, onCheck, onInstall, onOpen }: {
+  update: AppUpdateState;
+  onCheck: () => void;
+  onInstall: () => void;
+  onOpen: () => void;
+}) {
+  const isBusy = update.phase === "checking" ||
+    update.phase === "downloading" ||
+    update.phase === "installing" ||
+    update.phase === "restarting";
+  const status = update.phase === "checking" ? "Проверяем GitHub Releases…"
+    : update.phase === "available" ? `Доступна версия ${update.available?.version}`
+      : update.phase === "downloading" ? `Загружено ${formatBytes(update.downloadedBytes)}`
+        : update.phase === "installing" ? "Проверяем подпись и устанавливаем…"
+          : update.phase === "restarting" ? "Перезапускаем Маяк…"
+            : update.phase === "current" ? "Установлена последняя версия"
+              : update.phase === "failed" ? update.error
+                : "Проверяем при запуске и затем каждые 6 часов";
+  const action = update.available
+    ? update.phase === "available" || update.phase === "failed"
+      ? <button type="button" className="secondary-button" onClick={update.phase === "failed" ? onInstall : onOpen}>
+          {update.phase === "failed" ? "Повторить установку" : "Посмотреть"}
+        </button>
+      : <button type="button" className="secondary-button" disabled>Выполняется…</button>
+    : <button type="button" className="secondary-button" disabled={isBusy} onClick={onCheck}>
+        <RefreshCw className={update.phase === "checking" ? "is-spinning" : ""} aria-hidden="true" />
+        {update.phase === "checking" ? "Проверяем…" : "Проверить"}
+      </button>;
+  return (
+    <section className="settings-group">
+      <div className="settings-group__heading"><Download aria-hidden="true" /><div><h2>Обновления</h2><p>Только подписанные пакеты из официального GitHub Releases.</p></div></div>
+      <div className="permission-row"><span><strong>Версия Маяка</strong><small>{update.installedVersion ?? "Определяем…"}</small></span>{action}</div>
+      <div className={`update-status update-status--${update.phase}`}>
+        <ShieldCheck aria-hidden="true" />
+        <span><strong>{status}</strong>{update.lastCheckedAt && <small>Последняя проверка: {formatDate(update.lastCheckedAt, true)}</small>}</span>
+      </div>
+    </section>
+  );
+}
+
+function SettingsView({ settings, permissions, locationRequestAttempted, update, onSettingsChange, onRequestLocation, onCheckUpdates, onInstallUpdate, onOpenUpdate }: {
   settings: AppSettings; permissions: AppSnapshot["permissions"]; locationRequestAttempted: boolean;
+  update: AppUpdateState;
   onSettingsChange: (settings: AppSettings) => void; onRequestLocation: () => void;
+  onCheckUpdates: () => void; onInstallUpdate: () => void; onOpenUpdate: () => void;
 }) {
   const patch = <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => onSettingsChange({ ...settings, [key]: value });
   return (
@@ -470,6 +519,7 @@ function SettingsView({ settings, permissions, locationRequestAttempted, onSetti
         <label className="setting-row"><span><strong>Изменилась сеть</strong><small>Новый BSSID, шлюз или тип защиты</small></span>
           <input type="checkbox" className="switch" checked={settings.notifyNetworkChanges} onChange={(event) => patch("notifyNetworkChanges", event.target.checked)} /></label>
       </section>
+      <UpdateSettings update={update} onCheck={onCheckUpdates} onInstall={onInstallUpdate} onOpen={onOpenUpdate} />
       <section className="settings-group">
         <div className="settings-group__heading"><MapPin aria-hidden="true" /><div><h2>Системный доступ</h2><p>Геопозиция раскрывает только SSID/BSSID; сканирование работает без неё.</p></div></div>
         <div className="permission-row"><span><strong>Службы геолокации</strong><small>{permissionLabel(permissions.location)}</small></span>
@@ -479,6 +529,56 @@ function SettingsView({ settings, permissions, locationRequestAttempted, onSetti
         <div className="permission-row"><span><strong>Локальная сеть</strong><small>{permissionLabel(permissions.localNetwork)}</small></span>
           {permissions.localNetwork !== "allowed" ? <button type="button" className="secondary-button" onClick={() => void openPrivacySettings("localNetwork")}>Открыть настройки</button>
             : <span className="permission-ok"><Check aria-hidden="true" /> Разрешено</span>}</div>
+      </section>
+    </div>
+  );
+}
+
+function UpdateDialog({ update, onInstall, onClose }: {
+  update: AppUpdateState;
+  onInstall: () => void;
+  onClose: () => void;
+}) {
+  const available = update.available;
+  if (!available || !update.dialogOpen) return null;
+
+  const isBusy = update.phase === "downloading" ||
+    update.phase === "installing" ||
+    update.phase === "restarting";
+  const percentage = update.totalBytes && update.totalBytes > 0
+    ? Math.min(100, Math.round(update.downloadedBytes / update.totalBytes * 100))
+    : undefined;
+  const progressLabel = update.phase === "downloading"
+    ? `Загружаем${percentage === undefined ? "…" : `: ${percentage}%`}`
+    : update.phase === "installing" ? "Устанавливаем подписанное обновление…"
+      : update.phase === "restarting" ? "Перезапускаем Маяк…"
+        : undefined;
+
+  return (
+    <div className="modal-backdrop" role="presentation" onMouseDown={isBusy ? undefined : onClose}>
+      <section className="modal update-modal" role="dialog" aria-modal="true" aria-labelledby="update-title" onMouseDown={(event) => event.stopPropagation()}>
+        {!isBusy && <button type="button" className="icon-button modal__close" onClick={onClose} aria-label="Закрыть"><X aria-hidden="true" /></button>}
+        <span className="modal__icon"><Download aria-hidden="true" /></span>
+        <span className="eyebrow">Подписанное обновление</span>
+        <h2 id="update-title">Маяк {available.version}</h2>
+        <p>Установлена версия {available.currentVersion}. Маяк проверит подпись пакета до любых изменений и перезапустится только после установки.</p>
+        {available.notes && <div className="update-notes"><span className="eyebrow">Что изменилось</span><p>{available.notes}</p></div>}
+        <div className="modal__facts">
+          <span><ShieldCheck aria-hidden="true" /> Пакет подписан ключом проекта</span>
+          <span><Check aria-hidden="true" /> Загрузка только по HTTPS из GitHub Releases</span>
+          <span><RefreshCw aria-hidden="true" /> Перезапуск после успешной установки</span>
+        </div>
+        {progressLabel && <div className="update-progress" aria-live="polite">
+          <div><span>{progressLabel}</span>{update.totalBytes && <small>{formatBytes(update.downloadedBytes)} из {formatBytes(update.totalBytes)}</small>}</div>
+          <progress value={percentage} max={100} />
+        </div>}
+        {update.error && <p className="update-error" role="alert">{update.error}</p>}
+        <div className="modal__actions">
+          {!isBusy && <button type="button" className="secondary-button" onClick={onClose}>Позже</button>}
+          <button type="button" className="primary-button" disabled={isBusy} onClick={onInstall}>
+            <Download aria-hidden="true" />{isBusy ? "Обновляем…" : update.phase === "failed" ? "Повторить" : "Установить и перезапустить"}
+          </button>
+        </div>
       </section>
     </div>
   );
@@ -527,6 +627,7 @@ export default function App() {
   const [saved, setSaved] = useState(false);
   const [locationRequestAttempted, setLocationRequestAttempted] = useState(false);
   const [mascotMood, setMascotMood] = useState<MascotMood>("idle");
+  const updater = useAppUpdater();
 
   const load = useCallback(async () => {
     try {
@@ -693,7 +794,7 @@ export default function App() {
     { id: "overview", label: "Обзор", icon: Gauge },
     { id: "devices", label: "Устройства", icon: Network, badge: newCount || undefined },
     { id: "history", label: "История", icon: History },
-    { id: "settings", label: "Настройки", icon: Settings },
+    { id: "settings", label: "Настройки", icon: Settings, badge: updater.state.available ? 1 : undefined },
   ];
   const needsLocation = snapshot.permissions.location !== "allowed";
   const disconnected = !snapshot.network.connected;
@@ -739,7 +840,17 @@ export default function App() {
               : view === "overview" && report ? <Overview report={report} isScanning={isScanning} onSelectDevice={openDevice} onShowDevices={() => setView("devices")} />
                 : view === "devices" && report ? <DevicesView report={report} selectedDevice={selectedDevice} onSelectedDevice={setSelectedDevice} onTrustChange={(device, trust) => void changeTrust(device, trust)} />
                   : view === "history" ? <HistoryView entries={historyEntries} activeReport={report} />
-                    : <SettingsView settings={snapshot.settings} permissions={snapshot.permissions} locationRequestAttempted={locationRequestAttempted} onSettingsChange={(settings) => void changeSettings(settings)} onRequestLocation={() => void requestLocation()} />}
+                    : <SettingsView
+                        settings={snapshot.settings}
+                        permissions={snapshot.permissions}
+                        locationRequestAttempted={locationRequestAttempted}
+                        update={updater.state}
+                        onSettingsChange={(settings) => void changeSettings(settings)}
+                        onRequestLocation={() => void requestLocation()}
+                        onCheckUpdates={() => void updater.checkNow()}
+                        onInstallUpdate={() => void updater.install()}
+                        onOpenUpdate={updater.openDialog}
+                      />}
         </div>
       </main>
       {deepScanDialog && <div className="modal-backdrop" role="presentation" onMouseDown={() => setDeepScanDialog(false)}>
@@ -751,6 +862,7 @@ export default function App() {
           <div className="modal__actions"><button type="button" className="secondary-button" onClick={() => setDeepScanDialog(false)}>Отмена</button><button type="button" className="primary-button" onClick={() => void startScan("deep", true)}>Начать</button></div>
         </section>
       </div>}
+      <UpdateDialog update={updater.state} onInstall={() => void updater.install()} onClose={updater.dismissDialog} />
       {error && <div className="toast toast--error" role="alert"><AlertTriangle aria-hidden="true" /><span><strong>Не получилось выполнить действие</strong><small>{error}</small></span><button type="button" onClick={() => setError(undefined)} aria-label="Закрыть"><X aria-hidden="true" /></button></div>}
       {notice && <div className="toast toast--info" role="status"><Info aria-hidden="true" />{notice}</div>}
       {saved && <div className="toast toast--saved" role="status"><Check aria-hidden="true" />Сохранено</div>}
