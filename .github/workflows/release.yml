@@ -92,8 +92,11 @@ jobs:
           $msiTarget = "release-assets/Mayak-$version-windows-x64.msi"
           Copy-Item $setup.FullName $setupTarget
           Copy-Item $msi.FullName $msiTarget
-          (Get-FileHash $setupTarget -Algorithm SHA256).Hash.ToLower() + "  " + (Split-Path $setupTarget -Leaf) | Set-Content "$setupTarget.sha256"
-          (Get-FileHash $msiTarget -Algorithm SHA256).Hash.ToLower() + "  " + (Split-Path $msiTarget -Leaf) | Set-Content "$msiTarget.sha256"
+          $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+          $setupChecksum = (Get-FileHash $setupTarget -Algorithm SHA256).Hash.ToLower() + "  " + (Split-Path $setupTarget -Leaf) + "`n"
+          $msiChecksum = (Get-FileHash $msiTarget -Algorithm SHA256).Hash.ToLower() + "  " + (Split-Path $msiTarget -Leaf) + "`n"
+          [System.IO.File]::WriteAllText("$setupTarget.sha256", $setupChecksum, $utf8NoBom)
+          [System.IO.File]::WriteAllText("$msiTarget.sha256", $msiChecksum, $utf8NoBom)
 
       - name: Upload Windows installers
         uses: actions/upload-artifact@v7
