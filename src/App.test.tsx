@@ -18,7 +18,7 @@ describe("Маяк", () => {
     expect(
       screen.getByLabelText("Шлюз сети, Маршрутизатор"),
     ).toHaveAttribute("data-confidence", "high");
-    expect(screen.getByText("Имя Wi-Fi пока скрыто macOS")).toBeInTheDocument();
+    expect(screen.getByText("Имя Wi-Fi пока скрыто системой")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Проверить сеть" })).toBeEnabled();
   });
 

@@ -13,10 +13,45 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  check:
-    name: Frontend and Rust checks
+  macos:
+    name: macOS checks
     runs-on: macos-15
     timeout-minutes: 30
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Set up Rust
+        run: |
+          rustup toolchain install stable --profile minimal --component clippy,rustfmt
+          rustup default stable
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Check frontend
+        run: npm run check
+
+      - name: Check Rust formatting
+        run: cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check
+
+      - name: Lint Rust
+        run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+
+      - name: Test Rust
+        run: cargo test --manifest-path src-tauri/Cargo.toml --all-targets
+
+  windows:
+    name: Windows checks
+    runs-on: windows-latest
+    timeout-minutes: 35
 
     steps:
       - name: Check out repository

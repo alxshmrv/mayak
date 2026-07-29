@@ -41,7 +41,7 @@ impl ScanEngine {
             let _ = sender.send(ScanProgress {
                 phase: "network".to_owned(),
                 title: "Читаем параметры Wi‑Fi".to_owned(),
-                detail: "CoreWLAN, маршруты, DNS и сетевые интерфейсы".to_owned(),
+                detail: "Системный Wi‑Fi API, маршруты, DNS и сетевые интерфейсы".to_owned(),
                 completed: 0,
                 total: 1,
             });

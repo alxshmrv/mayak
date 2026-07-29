@@ -3,7 +3,6 @@
     reason = "Tauri commands deserialize owned parameters and require State extractors by value"
 )]
 
-use std::process::Command;
 use std::sync::Arc;
 
 use tauri::plugin::PermissionState as PluginPermissionState;
@@ -18,6 +17,7 @@ use crate::domain::{
 use crate::engine::ScanEngine;
 use crate::native;
 use crate::network::collect_network_context;
+use crate::platform;
 use crate::storage::Storage;
 
 pub struct AppState {
@@ -47,9 +47,10 @@ pub async fn get_app_snapshot(state: State<'_, AppState>) -> Result<AppSnapshot,
             if has_local_network_evidence {
                 PermissionState::Allowed
             } else {
-                // macOS has no public API that reports Local Network permission
-                // directly. A scan with no peers is therefore inconclusive: the
-                // network may be isolated, empty, or permission may be denied.
+                // Neither supported desktop platform exposes a reliable,
+                // cross-version Local Network permission state. A scan with no
+                // peers is therefore inconclusive: the network may be isolated,
+                // empty, or permission may be denied.
                 PermissionState::Unknown
             }
         });
@@ -169,19 +170,5 @@ pub fn request_notification_permission(app: AppHandle) -> Result<bool, String> {
 
 #[tauri::command]
 pub fn open_privacy_settings(section: String) -> Result<(), String> {
-    let url = match section.as_str() {
-        "localNetwork" => {
-            "x-apple.systempreferences:com.apple.preference.security?Privacy_LocalNetwork"
-        }
-        _ => "x-apple.systempreferences:com.apple.preference.security?Privacy_LocationServices",
-    };
-    let status = Command::new("/usr/bin/open")
-        .arg(url)
-        .status()
-        .map_err(|error| error.to_string())?;
-    if status.success() {
-        Ok(())
-    } else {
-        Err("macOS не открыла настройки конфиденциальности".to_owned())
-    }
+    platform::open_privacy_settings(&section)
 }

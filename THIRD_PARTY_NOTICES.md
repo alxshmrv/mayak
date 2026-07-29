@@ -19,6 +19,7 @@ MIT, но эта лицензия не заменяет лицензии зав�
 | Tokio | асинхронный runtime | MIT |
 | rusqlite / SQLite | локальное хранилище | MIT / Public Domain |
 | mdns-sd | локальное обнаружение | MIT OR Apache-2.0 |
+| windows-rs | Windows Native Wi-Fi, IP Helper и системные API | MIT OR Apache-2.0 |
 
 Среди транзитивных зависимостей также встречаются MPL-2.0, CC-BY-4.0,
 CC0-1.0, Unicode-3.0, BlueOak-1.0.0, 0BSD, Zlib, BSD, ISC, Unlicense и

@@ -1,0 +1,18 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "bundle": {
+    "targets": ["nsis", "msi"],
+    "windows": {
+      "allowDowngrades": false,
+      "nsis": {
+        "installMode": "currentUser",
+        "installerIcon": "icons/icon.ico",
+        "languages": ["Russian", "English"]
+      },
+      "wix": {
+        "language": "ru-RU",
+        "upgradeCode": "ad5af7a6-7acd-5b79-bebf-4d0c739f2375"
+      }
+    }
+  }
+}

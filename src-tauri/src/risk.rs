@@ -67,7 +67,7 @@ fn security_findings(network: &NetworkContext) -> Vec<Finding> {
                 "Не передавайте чувствительные данные без VPN. Для своей сети включите WPA3 или WPA2 AES."
                     .to_owned(),
             ),
-            evidence: vec![format!("CoreWLAN: {security}")],
+            evidence: vec![format!("Системный Wi‑Fi API: {security}")],
         });
     } else if security.contains("wpa3") || security == "owe" {
         findings.push(Finding {
@@ -80,7 +80,7 @@ fn security_findings(network: &NetworkContext) -> Vec<Finding> {
                 human_security(&security)
             ),
             recommendation: None,
-            evidence: vec![format!("CoreWLAN: {security}")],
+            evidence: vec![format!("Системный Wi‑Fi API: {security}")],
         });
     } else if security.contains("wpa2") {
         findings.push(Finding {
@@ -90,7 +90,7 @@ fn security_findings(network: &NetworkContext) -> Vec<Finding> {
             title: "Защита WPA2".to_owned(),
             description: "WPA2 остаётся приемлемым при использовании AES и сильного пароля; WPA3 предпочтительнее.".to_owned(),
             recommendation: None,
-            evidence: vec![format!("CoreWLAN: {security}")],
+            evidence: vec![format!("Системный Wi‑Fi API: {security}")],
         });
     } else {
         findings.push(Finding {
@@ -99,12 +99,12 @@ fn security_findings(network: &NetworkContext) -> Vec<Finding> {
             severity: Severity::Warning,
             title: "Тип защиты не определён".to_owned(),
             description:
-                "macOS не вернула режим безопасности или Wi‑Fi ещё не полностью подключён."
+                "Операционная система не вернула режим безопасности или Wi‑Fi ещё не полностью подключён."
                     .to_owned(),
             recommendation: Some(
                 "Разрешите доступ к геопозиции для Маяка и повторите проверку.".to_owned(),
             ),
-            evidence: vec!["CoreWLAN: unknown".to_owned()],
+            evidence: vec!["Системный Wi‑Fi API: unknown".to_owned()],
         });
     }
 
@@ -132,7 +132,7 @@ fn security_findings(network: &NetworkContext) -> Vec<Finding> {
                 "Системный туннель обнаружен. Маяк сканирует только прямую Wi‑Fi-подсеть и не затрагивает маршруты VPN."
                     .to_owned(),
             recommendation: None,
-            evidence: vec!["Активен интерфейс utun, ipsec или ppp".to_owned()],
+            evidence: vec!["Обнаружен активный туннельный или VPN-интерфейс".to_owned()],
         });
     }
 
@@ -380,6 +380,7 @@ mod tests {
             signal_quality: Some(90),
             transmit_rate_mbps: Some(866.0),
             country_code: Some("RU".to_owned()),
+            local_mac_address: Some("02:00:00:00:00:10".to_owned()),
             ipv4: Some("192.168.1.10".to_owned()),
             ipv6: Vec::new(),
             subnet: Some("192.168.1.0/24".to_owned()),

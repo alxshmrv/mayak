@@ -495,6 +495,7 @@ mod tests {
                 signal_quality: None,
                 transmit_rate_mbps: None,
                 country_code: None,
+                local_mac_address: None,
                 ipv4: Some("192.168.1.20".to_owned()),
                 ipv6: Vec::new(),
                 subnet: Some("192.168.1.0/24".to_owned()),

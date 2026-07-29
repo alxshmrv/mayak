@@ -6,6 +6,7 @@ mod error;
 mod fingerprint;
 mod native;
 mod network;
+mod platform;
 mod risk;
 mod storage;
 

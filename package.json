@@ -1,8 +1,8 @@
 {
   "name": "mayak",
   "private": true,
-  "version": "0.1.4",
-  "description": "Локальный центр доверия к Wi-Fi для macOS",
+  "version": "0.2.0",
+  "description": "Локальный центр доверия к Wi-Fi для macOS и Windows",
   "license": "MIT",
   "repository": {
     "type": "git",

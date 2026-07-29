@@ -1,7 +1,7 @@
 [package]
 name = "mayak"
-version = "0.1.4"
-description = "Локальный центр доверия к Wi-Fi для macOS"
+version = "0.2.0"
+description = "Локальный центр доверия к Wi-Fi для macOS и Windows"
 authors = ["Mayak contributors"]
 license = "MIT"
 repository = "https://github.com/alxshmrv/mayak"
@@ -36,6 +36,18 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 url = "2.5"
 uuid = { version = "1.19", features = ["serde", "v4"] }
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.61.3", features = [
+    "Win32_Foundation",
+    "Win32_NetworkManagement_IpHelper",
+    "Win32_NetworkManagement_Ndis",
+    "Win32_NetworkManagement_WiFi",
+    "Win32_Networking_WinSock",
+    "Win32_System_Registry",
+    "Win32_UI_Shell",
+    "Win32_UI_WindowsAndMessaging",
+] }
 
 [lints.rust]
 unsafe_code = "warn"

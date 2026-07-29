@@ -13,7 +13,7 @@ pub struct ChannelInfo {
 #[serde(rename_all = "camelCase")]
 #[allow(
     clippy::struct_excessive_bools,
-    reason = "This serializable snapshot intentionally mirrors independent macOS network facts"
+    reason = "This serializable snapshot intentionally mirrors independent operating-system network facts"
 )]
 pub struct NetworkContext {
     pub connected: bool,
@@ -29,6 +29,8 @@ pub struct NetworkContext {
     pub signal_quality: Option<u8>,
     pub transmit_rate_mbps: Option<f64>,
     pub country_code: Option<String>,
+    #[serde(default)]
+    pub local_mac_address: Option<String>,
     pub ipv4: Option<String>,
     pub ipv6: Vec<String>,
     pub subnet: Option<String>,
