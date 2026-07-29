@@ -77,8 +77,15 @@ CoreWLAN. Изменения в `src-tauri/src/native/`, `src-tauri/src/platform
   `src-tauri/tauri.conf.json`.
 - Тег `v*` запускает сборку DMG, NSIS и MSI. Публикуйте тег только после
   зелёного CI на macOS и Windows.
+- Updater-релиз требует `TAURI_SIGNING_PRIVATE_KEY` и
+  `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` в GitHub Actions Secrets. Приватный ключ
+  никогда не добавляется в Git.
+- Workflow держит релиз черновиком, пока не собраны обе платформы и не
+  проверены `latest.json`, подписи и SHA-256.
 - Готовые assets проверяются по приложенным SHA-256; GitHub-архивы исходников
   не являются установщиками.
+- Полный порядок выпуска и ротации ключа описан в
+  [release runbook](docs/RELEASING.md).
 
 Отправляя вклад, вы соглашаетесь распространять его на условиях лицензии MIT
 проекта.

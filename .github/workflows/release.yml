@@ -7,64 +7,69 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  build-macos:
-    name: Build macOS DMG
-    runs-on: macos-15
-    timeout-minutes: 45
+  validate:
+    name: Validate release metadata
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: "22"
-          cache: npm
 
-      - name: Set up Rust
-        run: |
-          rustup toolchain install stable --profile minimal
-          rustup default stable
-
-      - name: Install frontend dependencies
-        run: npm ci
-
-      - name: Build DMG
-        run: npm run tauri build -- --bundles dmg
-
-      - name: Prepare macOS release asset
+      - name: Verify synchronized versions
         shell: bash
         run: |
-          mkdir -p release-assets
-          version="$(node -p 'require("./package.json").version')"
-          source_dmg="$(find src-tauri/target/release/bundle/dmg -maxdepth 1 -name '*.dmg' -print -quit)"
-          test -n "$source_dmg"
-          asset_name="Mayak-${version}-macos-arm64.dmg"
-          cp "$source_dmg" "release-assets/$asset_name"
-          (cd release-assets && shasum -a 256 "$asset_name" > "$asset_name.sha256")
+          set -euo pipefail
+          package_version="$(node -p 'require("./package.json").version')"
+          tauri_version="$(node -p 'require("./src-tauri/tauri.conf.json").version')"
+          cargo_version="$(sed -n 's/^version = "\(.*\)"/\1/p' src-tauri/Cargo.toml | head -1)"
+          test "$package_version" = "$tauri_version"
+          test "$package_version" = "$cargo_version"
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            test "${GITHUB_REF_NAME#v}" = "$package_version"
+          fi
 
-      - name: Upload macOS installer
-        uses: actions/upload-artifact@v7
-        with:
-          name: macos-installer
-          path: release-assets/*
-          if-no-files-found: error
-
-  build-windows:
-    name: Build Windows installers
-    runs-on: windows-latest
-    timeout-minutes: 50
+  build:
+    name: Build ${{ matrix.name }}
+    needs: validate
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      # tauri-action merges platform entries into one latest.json. Serializing
+      # prevents two matrix jobs from overwriting that shared manifest.
+      max-parallel: 1
+      matrix:
+        include:
+          - name: macOS DMG
+            runner: macos-15
+            # The app bundle is the signed .app.tar.gz updater payload; the DMG
+            # remains the installer people download from the release page.
+            bundles: app,dmg
+          - name: Windows NSIS and MSI
+            runner: windows-latest
+            bundles: nsis,msi
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: "22"
           cache: npm
@@ -77,50 +82,77 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
-      - name: Build NSIS and MSI installers
-        run: npm run tauri build -- --bundles nsis,msi
-
-      - name: Prepare Windows release assets
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force release-assets | Out-Null
-          $version = (Get-Content package.json | ConvertFrom-Json).version
-          $setup = Get-ChildItem src-tauri/target/release/bundle/nsis/*.exe | Select-Object -First 1
-          $msi = Get-ChildItem src-tauri/target/release/bundle/msi/*.msi | Select-Object -First 1
-          if (-not $setup -or -not $msi) { throw "Windows installers were not produced" }
-          $setupTarget = "release-assets/Mayak-$version-windows-x64-setup.exe"
-          $msiTarget = "release-assets/Mayak-$version-windows-x64.msi"
-          Copy-Item $setup.FullName $setupTarget
-          Copy-Item $msi.FullName $msiTarget
-          $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
-          $setupChecksum = (Get-FileHash $setupTarget -Algorithm SHA256).Hash.ToLower() + "  " + (Split-Path $setupTarget -Leaf) + "`n"
-          $msiChecksum = (Get-FileHash $msiTarget -Algorithm SHA256).Hash.ToLower() + "  " + (Split-Path $msiTarget -Leaf) + "`n"
-          [System.IO.File]::WriteAllText("$setupTarget.sha256", $setupChecksum, $utf8NoBom)
-          [System.IO.File]::WriteAllText("$msiTarget.sha256", $msiChecksum, $utf8NoBom)
-
-      - name: Upload Windows installers
-        uses: actions/upload-artifact@v7
+      - name: Build signed updater artifacts
+        uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # v1.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          name: windows-installers
-          path: release-assets/*
-          if-no-files-found: error
+          tagName: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || '' }}
+          releaseName: "Маяк __VERSION__ — macOS и Windows"
+          releaseBody: |
+            Выберите готовый установщик: DMG для Apple Silicon, setup.exe для
+            обычной установки Windows или MSI для управляемого развёртывания.
+            Архивы Source code не являются установщиками.
+          generateReleaseNotes: true
+          releaseDraft: true
+          prerelease: false
+          args: --bundles ${{ matrix.bundles }}
+          retryAttempts: 2
+          uploadUpdaterJson: true
+          updaterJsonPreferNsis: true
+          uploadUpdaterSignatures: true
+          releaseAssetNamePattern: "Mayak-[version]-[platform]-[arch][setup][ext]"
+          uploadWorkflowArtifacts: true
+          workflowArtifactNamePattern: "${{ matrix.name }}"
 
-  publish:
-    name: Publish GitHub release
-    needs: [build-macos, build-windows]
+  finalize:
+    name: Verify and finalize release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
+    timeout-minutes: 10
+    permissions:
+      contents: write
 
     steps:
-      - name: Download installers
-        uses: actions/download-artifact@v8
-        with:
-          path: release-assets
-          merge-multiple: true
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - name: Publish installers
-        uses: softprops/action-gh-release@v3
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
-          prerelease: true
-          generate_release_notes: true
-          files: release-assets/*
+          node-version: "22"
+
+      - name: Download published assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release download "$GITHUB_REF_NAME" --dir release-assets
+
+      - name: Validate updater manifest
+        run: node scripts/validate-updater-manifest.mjs release-assets/latest.json "${GITHUB_REF_NAME#v}"
+
+      - name: Create installer checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          for extension in dmg exe msi; do
+            test -n "$(find release-assets -maxdepth 1 -type f -name "*.$extension" -print -quit)"
+          done
+          find release-assets -maxdepth 1 -type f \
+            \( -name '*.dmg' -o -name '*.exe' -o -name '*.msi' \) \
+            -print0 |
+            while IFS= read -r -d '' asset; do
+              name="$(basename "$asset")"
+              (cd release-assets && sha256sum "$name" > "$name.sha256")
+            done
+
+      - name: Upload checksums and mark latest
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release upload "$GITHUB_REF_NAME" release-assets/*.sha256 --clobber
+          gh release edit "$GITHUB_REF_NAME" --draft=false --latest
