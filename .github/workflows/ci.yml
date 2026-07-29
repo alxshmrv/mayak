@@ -51,7 +51,7 @@ jobs:
   windows:
     name: Windows checks
     runs-on: windows-latest
-    timeout-minutes: 35
+    timeout-minutes: 50
 
     steps:
       - name: Check out repository
@@ -82,3 +82,15 @@ jobs:
 
       - name: Test Rust
         run: cargo test --manifest-path src-tauri/Cargo.toml --all-targets
+
+      - name: Build Windows installers
+        run: npm run tauri build -- --bundles nsis,msi
+
+      - name: Upload Windows installer smoke artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-installer-smoke
+          path: |
+            src-tauri/target/release/bundle/nsis/*.exe
+            src-tauri/target/release/bundle/msi/*.msi
+          if-no-files-found: error
