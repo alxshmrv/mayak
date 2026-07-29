@@ -1,6 +1,7 @@
 # Маяк
 
 [![CI](https://github.com/alxshmrv/mayak/actions/workflows/ci.yml/badge.svg)](https://github.com/alxshmrv/mayak/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/alxshmrv/mayak?include_prereleases&label=release)](https://github.com/alxshmrv/mayak/releases)
 [![macOS 15+](https://img.shields.io/badge/macOS-15%2B-111318?logo=apple)](https://github.com/alxshmrv/mayak)
 [![Windows 10/11](https://img.shields.io/badge/Windows-10%20%2F%2011-0078d4?logo=windows)](https://github.com/alxshmrv/mayak)
 [![Rust 1.88+](https://img.shields.io/badge/Rust-1.88%2B-dea584?logo=rust)](https://www.rust-lang.org/)
@@ -21,7 +22,8 @@
 
 ## Возможности
 
-- SSID, BSSID, защита, канал, диапазон, RSSI, шум и скорость соединения;
+- SSID, BSSID, защита, канал, диапазон, RSSI, скорость соединения и другие
+  параметры, которые раскрывает текущая операционная система;
 - IP-адреса, подсеть, шлюз, DNS, прокси и признаки активного VPN;
 - обнаружение через ARP, mDNS, SSDP/UPnP, ONVIF и ограниченные TCP-проверки
   только в текущей локальной подсети;
@@ -52,25 +54,45 @@ Client isolation в отеле, отдельные VLAN, фильтрация mu
 Радар в интерфейсе — визуализация процесса обнаружения. Радиус означает
 уверенность в классификации устройства, а не физическое расстояние до него.
 
-## Установка и статус релиза
+## Поддерживаемые платформы
+
+| Платформа | Архитектура | Минимальная версия | Готовые пакеты | Системная интеграция |
+| --- | --- | --- | --- | --- |
+| macOS | Apple Silicon, arm64 | macOS 15 | DMG | CoreWLAN, CoreLocation, системные маршруты и ARP |
+| Windows | x64 | Windows 10/11 | NSIS setup.exe, MSI | Native Wi-Fi, IP Helper, Winsock |
+
+Обнаружение устройств, история, доверие, оценка риска, мониторинг и интерфейс
+одинаковы на обеих платформах. Набор низкоуровневых Wi‑Fi-метрик может
+различаться: например, Windows не всегда предоставляет шум, код страны или
+ширину канала. Маяк явно показывает «не определено», а не подставляет значение.
+Подробная матрица — в [документе о поддержке платформ](docs/PLATFORMS.md).
+
+## Установка
 
 Проект публикуется как open-source beta для Apple Silicon/macOS 15+ и
-64-битных Windows 10/11. На странице
-[Releases](https://github.com/alxshmrv/mayak/releases) выбирайте готовый
-установщик, а не автоматически добавленные GitHub архивы исходников:
+64-битных Windows 10/11. Текущий выпуск —
+[v0.2.0](https://github.com/alxshmrv/mayak/releases/tag/v0.2.0):
 
-- `Mayak-<версия>-macos-arm64.dmg` — установщик для Mac;
-- `Mayak-<версия>-windows-x64-setup.exe` — рекомендуемый установщик Windows;
-- `Mayak-<версия>-windows-x64.msi` — MSI для ручного или корпоративного
-  развёртывания.
+- [Mayak-0.2.0-macos-arm64.dmg](https://github.com/alxshmrv/mayak/releases/download/v0.2.0/Mayak-0.2.0-macos-arm64.dmg)
+  — Mac с Apple Silicon;
+- [Mayak-0.2.0-windows-x64-setup.exe](https://github.com/alxshmrv/mayak/releases/download/v0.2.0/Mayak-0.2.0-windows-x64-setup.exe)
+  — рекомендуемый установщик Windows;
+- [Mayak-0.2.0-windows-x64.msi](https://github.com/alxshmrv/mayak/releases/download/v0.2.0/Mayak-0.2.0-windows-x64.msi)
+  — MSI для ручного или корпоративного развёртывания.
 
 Публичные beta-сборки пока не подписаны сертификатами Apple и Microsoft:
 macOS Gatekeeper или Windows SmartScreen могут показать предупреждение.
 Проверяйте SHA-256 рядом с установщиком и загружайте файлы только из Releases
-этого репозитория.
+этого репозитория. Пошаговая установка, проверка SHA-256 и удаление описаны в
+[инструкции по установке](docs/INSTALLATION.md).
 
-Для самостоятельной сборки нужны Rust 1.88+, Node.js 22.12+ и системные
-инструменты разработки целевой платформы:
+GitHub автоматически добавляет к каждому релизу архивы `Source code`. Для
+обычной установки они не нужны — выбирайте DMG, setup.exe или MSI.
+
+## Сборка из исходников
+
+Нужны Rust 1.88+, Node.js 22.12+ и системные инструменты разработки целевой
+платформы:
 
 ```bash
 git clone https://github.com/alxshmrv/mayak.git
@@ -79,7 +101,8 @@ npm ci
 npm run tauri build
 ```
 
-DMG, NSIS setup.exe или MSI появятся в `src-tauri/target/release/bundle/`.
+На macOS будет собран DMG, на Windows — NSIS setup.exe и MSI. Результат
+появится в `src-tauri/target/release/bundle/`.
 
 ## Разработка
 
@@ -126,6 +149,17 @@ React UI
 Сканер ограничивает число одновременных соединений, привязывает multicast и
 ONVIF-сокеты к Wi‑Fi-интерфейсу и не выходит за границы текущей локальной
 подсети.
+
+## Документация
+
+- [Установка и удаление](docs/INSTALLATION.md)
+- [Поддержка и различия платформ](docs/PLATFORMS.md)
+- [Продуктовые принципы](PRODUCT.md)
+- [Дизайн-система](DESIGN.md)
+- [Приватность](PRIVACY.md)
+- [Политика безопасности](SECURITY.md)
+- [Участие в разработке](CONTRIBUTING.md)
+- [История изменений](CHANGELOG.md)
 
 ## Безопасность и участие
 

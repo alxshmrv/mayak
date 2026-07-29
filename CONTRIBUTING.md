@@ -17,7 +17,8 @@
 
 Нужны Rust 1.88+ и Node.js 22.12+. Для macOS также требуются macOS 15+ и Xcode
 Command Line Tools; для Windows — 64-битная Windows 10/11, Microsoft C++ Build
-Tools и WebView2.
+Tools и WebView2 Runtime. Подробности — в
+[матрице платформ](docs/PLATFORMS.md).
 
 ```bash
 npm ci
@@ -33,11 +34,27 @@ cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
 cargo test --manifest-path src-tauri/Cargo.toml --all-targets
 ```
 
-Для изменений нативной интеграции также соберите приложение:
+Для изменений нативной интеграции также соберите приложение на затронутой
+платформе:
+
+```bash
+# macOS
+npm run tauri build -- --bundles dmg
+
+# Windows
+npm run tauri build -- --bundles nsis,msi
+```
+
+Обычная сборка текущей платформы:
 
 ```bash
 npm run tauri build
 ```
+
+macOS не компилирует Windows FFI-модули, а Windows не компилирует мост
+CoreWLAN. Изменения в `src-tauri/src/native/`, `src-tauri/src/platform/`,
+`build.rs` или platform-specific конфигурации должны пройти CI обеих
+платформ.
 
 ## Требования к изменениям
 
@@ -50,6 +67,18 @@ npm run tauri build
 - Новые зависимости требуют объяснения и совместимой open-source лицензии.
 - Пользовательский текст пишется по-русски; имена кода и комментарии — по
   принятому в проекте английскому стилю.
+
+## Документация и релизы
+
+- Пользовательское изменение добавляется в `CHANGELOG.md`.
+- Новое платформенное поведение отражается в `README.md`,
+  `docs/PLATFORMS.md`, а при необходимости — в `PRIVACY.md`.
+- Версия синхронизируется в `package.json`, `src-tauri/Cargo.toml` и
+  `src-tauri/tauri.conf.json`.
+- Тег `v*` запускает сборку DMG, NSIS и MSI. Публикуйте тег только после
+  зелёного CI на macOS и Windows.
+- Готовые assets проверяются по приложенным SHA-256; GitHub-архивы исходников
+  не являются установщиками.
 
 Отправляя вклад, вы соглашаетесь распространять его на условиях лицензии MIT
 проекта.

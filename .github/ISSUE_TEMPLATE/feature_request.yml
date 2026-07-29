@@ -15,6 +15,17 @@ body:
       label: Как должно работать решение?
     validations:
       required: true
+  - type: dropdown
+    id: platforms
+    attributes:
+      label: Затронутые платформы
+      multiple: true
+      options:
+        - macOS
+        - Windows
+        - Другая система
+    validations:
+      required: true
   - type: textarea
     id: safety
     attributes:

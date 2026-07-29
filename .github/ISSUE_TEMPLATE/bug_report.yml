@@ -12,14 +12,25 @@ body:
     id: version
     attributes:
       label: Версия Маяка
-      placeholder: 0.1.4
+      placeholder: 0.2.0
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Платформа
+      options:
+        - macOS, Apple Silicon
+        - Windows, x64
+        - Неподдерживаемая или другая система
     validations:
       required: true
   - type: input
-    id: macos
+    id: environment
     attributes:
-      label: Версия macOS и модель Mac
-      placeholder: macOS 15.x, MacBook Pro M3
+      label: Версия системы и устройство
+      description: Укажите версию ОС, модель компьютера или важные сведения об оборудовании.
+      placeholder: macOS 15.x, MacBook Pro M3 или Windows 11 24H2, x64
     validations:
       required: true
   - type: textarea
