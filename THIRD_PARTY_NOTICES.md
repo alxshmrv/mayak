@@ -27,6 +27,12 @@ MIT, но эта лицензия не заменяет лицензии зав�
 Apple frameworks являются системными компонентами macOS и не поставляются
 внутри приложения как сторонние библиотеки.
 
+Снимок `src-tauri/data/ieee-ma.tsv` сгенерирован из публичных реестров
+назначений MA-L, MA-M и MA-S IEEE Registration Authority. Исходные реестры и
+названия организаций сохраняют авторские права IEEE и их владельцев и не
+переходят под MIT-лицензию кода Маяка. Актуальные исходные списки опубликованы
+на <https://standards.ieee.org/products-programs/regauth/>.
+
 Среди транзитивных зависимостей также встречаются MPL-2.0, CC-BY-4.0,
 CC0-1.0, Unicode-3.0, BlueOak-1.0.0, 0BSD, Zlib, BSD, ISC, Unlicense и
 Apache-2.0 WITH LLVM-exception. В частности:

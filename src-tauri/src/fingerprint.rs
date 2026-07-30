@@ -7,6 +7,7 @@ use sha2::{Digest, Sha256};
 use crate::domain::{
     Confidence, DeviceKind, Finding, ObservedDevice, ServiceEvidence, Severity, TrustState,
 };
+use crate::vendor::{is_locally_administered, vendor_for_mac};
 
 #[derive(Debug, Clone)]
 pub struct RawDevice {
@@ -65,10 +66,16 @@ impl RawDevice {
 pub fn finalize_device(raw: RawDevice, observed_at: DateTime<Utc>) -> ObservedDevice {
     let mac_address = raw.mac_address.as_deref().map(normalize_mac);
     let vendor = mac_address.as_deref().and_then(vendor_for_mac);
+    let uses_private_mac = mac_address.as_deref().is_some_and(is_locally_administered);
     let (kind, type_confidence) = infer_kind(&raw, vendor.as_deref());
     let display_name = display_name(&raw, kind, vendor.as_deref());
     let identity_key = identity_key(&raw, mac_address.as_deref());
     let findings = device_findings(&raw, kind, vendor.as_deref());
+    let mut evidence = raw.evidence;
+    if uses_private_mac {
+        evidence
+            .insert("Приватный MAC-адрес: производитель по IEEE OUI не определяется".to_owned());
+    }
 
     ObservedDevice {
         identity_key,
@@ -81,7 +88,7 @@ pub fn finalize_device(raw: RawDevice, observed_at: DateTime<Utc>) -> ObservedDe
         hostnames: raw.hostnames.into_iter().collect(),
         open_ports: raw.open_ports.into_iter().collect(),
         services: raw.services,
-        evidence: raw.evidence.into_iter().collect(),
+        evidence: evidence.into_iter().collect(),
         trust_state: if raw.is_local_mac {
             TrustState::Mine
         } else {
@@ -121,30 +128,130 @@ fn display_name(raw: &RawDevice, kind: DeviceKind, vendor: Option<&str>) -> Stri
     if raw.is_local_mac {
         return "Этот компьютер".to_owned();
     }
-    if let Some(hostname) = raw.hostnames.iter().next() {
-        return clean_hostname(hostname);
-    }
     if raw.is_router {
+        if let Some(product) = upnp_product_name(raw) {
+            return product;
+        }
+        if let Some(hostname) = best_hostname(raw) {
+            return hostname;
+        }
+        if let Some(vendor) = vendor {
+            return format!("{vendor} · шлюз сети");
+        }
         return "Шлюз сети".to_owned();
     }
-    if let Some(service) = raw
-        .services
-        .iter()
-        .find(|service| service.protocol == "mdns" && !service.name.trim().is_empty())
-    {
+    if let Some(hostname) = best_hostname(raw) {
+        return hostname;
+    }
+    if let Some(service) = raw.services.iter().find(|service| {
+        service.protocol == "mdns"
+            && !service.name.trim().is_empty()
+            && is_human_name(&service.name)
+    }) {
         return clean_hostname(&service.name);
     }
     if let Some(vendor) = vendor {
         return format!("{vendor} · {}", kind_label(kind));
     }
+    if raw
+        .mac_address
+        .as_deref()
+        .is_some_and(is_locally_administered)
+    {
+        return "Устройство с приватным MAC".to_owned();
+    }
     kind_label(kind).to_owned()
 }
 
 fn clean_hostname(value: &str) -> String {
-    value
+    let cleaned = value
         .trim_end_matches('.')
         .trim_end_matches(".local")
-        .replace("\\032", " ")
+        .replace("\\032", " ");
+    let lower = cleaned.to_ascii_lowercase();
+    if let Some(rest) = lower.strip_prefix("yandex-station-") {
+        let model = rest
+            .rsplit_once('-')
+            .filter(|(_, suffix)| looks_like_device_id(suffix))
+            .map_or(rest, |(model, _)| model);
+        return format!("Yandex Station {}", title_case_words(model));
+    }
+    cleaned
+}
+
+fn best_hostname(raw: &RawDevice) -> Option<String> {
+    raw.hostnames
+        .iter()
+        .map(|hostname| clean_hostname(hostname))
+        .find(|hostname| is_human_name(hostname))
+}
+
+fn is_human_name(value: &str) -> bool {
+    let trimmed = value.trim();
+    if trimmed.is_empty() || trimmed.parse::<Ipv4Addr>().is_ok() {
+        return false;
+    }
+    let compact = trimmed
+        .chars()
+        .filter(char::is_ascii_hexdigit)
+        .collect::<String>();
+    if compact.len() == 12
+        && trimmed
+            .chars()
+            .all(|character| character.is_ascii_hexdigit() || matches!(character, ':' | '-' | '.'))
+    {
+        return false;
+    }
+    let alphanumeric_count = trimmed.chars().filter(char::is_ascii_alphanumeric).count();
+    let hex_count = trimmed.chars().filter(char::is_ascii_hexdigit).count();
+    alphanumeric_count < 16 || hex_count * 4 < alphanumeric_count * 3
+}
+
+fn looks_like_device_id(value: &str) -> bool {
+    value.len() >= 10
+        && value
+            .chars()
+            .all(|character| character.is_ascii_alphanumeric())
+        && value.chars().any(|character| character.is_ascii_digit())
+}
+
+fn title_case_words(value: &str) -> String {
+    value
+        .split(['-', '_'])
+        .filter(|word| !word.is_empty())
+        .map(|word| {
+            let mut characters = word.chars();
+            characters.next().map_or_else(String::new, |first| {
+                first.to_uppercase().collect::<String>() + characters.as_str()
+            })
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn upnp_product_name(raw: &RawDevice) -> Option<String> {
+    let server = raw
+        .services
+        .iter()
+        .find(|service| service.protocol == "ssdp")?
+        .name
+        .split_whitespace()
+        .collect::<Vec<_>>();
+    let product_start = server
+        .iter()
+        .position(|part| part.to_ascii_lowercase().starts_with("upnp/"))?
+        + 1;
+    let mut product = server.get(product_start..)?.to_vec();
+    if let Some(last) = product.last_mut()
+        && let Some((name, version)) = last.rsplit_once('/')
+        && version
+            .chars()
+            .all(|character| character.is_ascii_digit() || character == '.')
+    {
+        *last = name;
+    }
+    let value = product.join(" ");
+    (!value.trim().is_empty()).then_some(value)
 }
 
 fn infer_kind(raw: &RawDevice, vendor: Option<&str>) -> (DeviceKind, Confidence) {
@@ -195,6 +302,15 @@ fn infer_kind(raw: &RawDevice, vendor: Option<&str>) -> (DeviceKind, Confidence)
     if contains_any(&service_text, &["_hap.", "homekit"]) {
         return (DeviceKind::SmartHome, Confidence::High);
     }
+    if contains_any(&service_text, &["_matter.", "_matterc."]) {
+        return (DeviceKind::SmartHome, Confidence::High);
+    }
+    if contains_any(
+        &service_text,
+        &["_yandexio.", "_androidtvremote", "_googlezone."],
+    ) {
+        return (DeviceKind::Media, Confidence::High);
+    }
     if let Some(kind) = infer_kind_from_hostname(&hostname_text) {
         return (kind, Confidence::Medium);
     }
@@ -216,6 +332,9 @@ fn infer_kind(raw: &RawDevice, vendor: Option<&str>) -> (DeviceKind, Confidence)
         ],
     ) {
         return (DeviceKind::NetworkEquipment, Confidence::Medium);
+    }
+    if contains_any(&vendor_lower, &["tuya", "philips hue"]) {
+        return (DeviceKind::SmartHome, Confidence::Medium);
     }
     if contains_any(&service_text, &["_workstation.", "_ssh.", "_smb."])
         || raw.open_ports.contains(&22)
@@ -304,31 +423,21 @@ fn device_findings(raw: &RawDevice, kind: DeviceKind, vendor: Option<&str>) -> V
 }
 
 fn normalize_mac(value: &str) -> String {
+    let octets = value
+        .trim()
+        .split([':', '-'])
+        .map(|octet| u8::from_str_radix(octet, 16))
+        .collect::<Result<Vec<_>, _>>();
+    if let Ok(octets) = octets
+        && octets.len() == 6
+    {
+        return octets
+            .into_iter()
+            .map(|octet| format!("{octet:02x}"))
+            .collect::<Vec<_>>()
+            .join(":");
+    }
     value.trim().replace('-', ":").to_ascii_lowercase()
-}
-
-fn vendor_for_mac(mac: &str) -> Option<String> {
-    let compact = mac.replace(':', "").to_ascii_uppercase();
-    let prefix = compact.get(..6)?;
-    let vendor = match prefix {
-        "000C29" | "001C14" | "005056" => "VMware",
-        "001A11" | "3C5AB4" | "F4F5D8" => "Google",
-        "001E06" | "3C6104" | "F0D1A9" => "Wibrain / Networking",
-        "0023AE" | "18E829" | "44D9E7" | "F09FC2" => "Ubiquiti",
-        "001B63" | "001EC2" | "3C0754" | "A4C361" | "F01898" => "Apple",
-        "000C43" | "50C7BF" | "B0BE76" => "TP-Link",
-        "000F7C" | "4C60DE" | "C05627" => "Hikvision",
-        "3C678C" | "A0BD1D" | "E0508B" => "Dahua",
-        "00408C" | "B8A44F" | "ACCC8E" => "Axis",
-        "EC71DB" | "2C9EFC" => "Reolink",
-        "001788" | "ECB5FA" => "Philips Hue",
-        "18B430" | "6854FD" | "FC65DE" => "Nest",
-        "F0272D" | "A0D0DC" | "B4E62D" => "Amazon",
-        "001018" | "00095B" | "A42B8C" => "Broadcom / Router",
-        "D850E6" | "CC2D21" | "DC2C6E" => "ASUSTek",
-        _ => return None,
-    };
-    Some(vendor.to_owned())
 }
 
 fn contains_any(haystack: &str, needles: &[&str]) -> bool {
@@ -407,5 +516,86 @@ mod tests {
         });
         let device = finalize_device(raw, Utc::now());
         assert_eq!(device.display_name, "Компьютер");
+    }
+
+    #[test]
+    fn router_uses_product_from_ssdp_server_header() {
+        let mut raw = RawDevice::new(Ipv4Addr::new(192, 168, 1, 1));
+        raw.is_router = true;
+        raw.mac_address = Some("d8:44:89:3b:3c:00".to_owned());
+        raw.hostnames.insert("192.168.1.1".to_owned());
+        raw.services.push(ServiceEvidence {
+            protocol: "ssdp".to_owned(),
+            name: "TPOS/V1.0.0 UPnP/1.0 Archer C80/2.20".to_owned(),
+            service_type: Some("upnp:rootdevice".to_owned()),
+            port: None,
+            details: Vec::new(),
+        });
+
+        let device = finalize_device(raw, Utc::now());
+        assert_eq!(device.display_name, "Archer C80");
+        assert_eq!(device.vendor.as_deref(), Some("TP-Link"));
+    }
+
+    #[test]
+    fn yandex_mdns_hostname_becomes_readable_media_name() {
+        let mut raw = RawDevice::new(Ipv4Addr::new(192, 168, 1, 104));
+        raw.hostnames
+            .insert("yandex-station-midi-R104ZT300FM43N.local.".to_owned());
+        raw.services.push(ServiceEvidence {
+            protocol: "mdns".to_owned(),
+            name: "YandexIOReceiver-R104ZT300FM43N".to_owned(),
+            service_type: Some("_yandexio._tcp.local.".to_owned()),
+            port: Some(1961),
+            details: vec!["platform: cucumber".to_owned()],
+        });
+
+        let device = finalize_device(raw, Utc::now());
+        assert_eq!(device.display_name, "Yandex Station Midi");
+        assert_eq!(device.kind, DeviceKind::Media);
+    }
+
+    #[test]
+    fn matter_service_identifies_smart_home_without_using_hex_as_a_name() {
+        let mut raw = RawDevice::new(Ipv4Addr::new(192, 168, 1, 107));
+        raw.mac_address = Some("ac:ba:c0:b6:20:92".to_owned());
+        raw.hostnames.insert("ACBAC0B62092.local.".to_owned());
+        raw.services.push(ServiceEvidence {
+            protocol: "mdns".to_owned(),
+            name: "40C0B5E11EA59CE6-0000000000000102".to_owned(),
+            service_type: Some("_matter._tcp.local.".to_owned()),
+            port: Some(5540),
+            details: vec!["T: 1".to_owned()],
+        });
+
+        let device = finalize_device(raw, Utc::now());
+        assert_eq!(device.display_name, "Intertech Services AG · Умный дом");
+        assert_eq!(device.kind, DeviceKind::SmartHome);
+    }
+
+    #[test]
+    fn private_mac_is_explained_without_claiming_a_vendor() {
+        let mut raw = RawDevice::new(Ipv4Addr::new(192, 168, 1, 108));
+        raw.mac_address = Some("a2:e8:06:f2:e2:80".to_owned());
+
+        let device = finalize_device(raw, Utc::now());
+        assert_eq!(device.display_name, "Устройство с приватным MAC");
+        assert!(device.vendor.is_none());
+        assert!(
+            device
+                .evidence
+                .iter()
+                .any(|item| item.starts_with("Приватный MAC-адрес"))
+        );
+    }
+
+    #[test]
+    fn macos_arp_short_octets_are_zero_padded_before_vendor_lookup() {
+        let mut raw = RawDevice::new(Ipv4Addr::new(192, 168, 1, 105));
+        raw.mac_address = Some("64:48:42:b4:7:ab".to_owned());
+
+        let device = finalize_device(raw, Utc::now());
+        assert_eq!(device.mac_address.as_deref(), Some("64:48:42:b4:07:ab"));
+        assert_eq!(device.vendor.as_deref(), Some("Apple"));
     }
 }
