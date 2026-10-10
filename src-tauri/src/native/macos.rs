@@ -24,7 +24,7 @@ pub fn wifi_snapshot() -> AppResult<NativeWifiSnapshot> {
     let pointer = unsafe { mayak_copy_wifi_json() };
     if pointer.is_null() {
         return Err(AppError::Platform(
-            "CoreWLAN не вернул данные Wi‑Fi".to_owned(),
+            "CoreWLAN returned no Wi‑Fi data".to_owned(),
         ));
     }
 

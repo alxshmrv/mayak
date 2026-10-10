@@ -168,7 +168,7 @@ pub fn open_privacy_settings(section: &str) -> Result<(), String> {
     if result.0 as isize > 32 {
         Ok(())
     } else {
-        Err("Windows не открыла системные настройки".to_owned())
+        Err("Windows did not open system settings".to_owned())
     }
 }
 

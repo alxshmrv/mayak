@@ -9,6 +9,7 @@ use uuid::Uuid;
 use crate::discovery::discover;
 use crate::domain::{ScanMode, ScanProgress, ScanReport};
 use crate::error::{AppError, AppResult};
+use crate::i18n::Language;
 use crate::network::collect_network_context;
 use crate::risk::assess;
 use crate::storage::Storage;
@@ -29,6 +30,7 @@ impl ScanEngine {
     pub async fn scan(
         &self,
         mode: ScanMode,
+        language: Language,
         progress: Option<UnboundedSender<ScanProgress>>,
     ) -> AppResult<ScanReport> {
         let Ok(_guard) = self.scan_lock.try_lock() else {
@@ -40,8 +42,15 @@ impl ScanEngine {
         if let Some(sender) = progress.as_ref() {
             let _ = sender.send(ScanProgress {
                 phase: "network".to_owned(),
-                title: "Читаем параметры Wi‑Fi".to_owned(),
-                detail: "Системный Wi‑Fi API, маршруты, DNS и сетевые интерфейсы".to_owned(),
+                title: language
+                    .pick("Читаем параметры Wi‑Fi", "Reading Wi‑Fi settings")
+                    .to_owned(),
+                detail: language
+                    .pick(
+                        "Системный Wi‑Fi API, маршруты, DNS и сетевые интерфейсы",
+                        "System Wi‑Fi API, routes, DNS, and network interfaces",
+                    )
+                    .to_owned(),
                 completed: 0,
                 total: 1,
             });
@@ -53,11 +62,17 @@ impl ScanEngine {
         let previous = self
             .storage
             .latest_report_for_ssid(network.ssid.as_deref())?;
-        let output = Box::pin(discover(&network, mode, progress.as_ref())).await?;
+        let output = Box::pin(discover(&network, mode, language, progress.as_ref())).await?;
         let mut devices = output.devices;
         self.storage
             .enrich_device_history(&network.network_id, &mut devices)?;
-        let assessment = assess(&network, &devices, &output.coverage, previous.as_ref());
+        let assessment = assess(
+            &network,
+            &devices,
+            &output.coverage,
+            previous.as_ref(),
+            language,
+        );
         let completed_at = Utc::now();
         let report = ScanReport {
             id: Uuid::new_v4().to_string(),
@@ -75,12 +90,21 @@ impl ScanEngine {
         if let Some(sender) = progress {
             let _ = sender.send(ScanProgress {
                 phase: "complete".to_owned(),
-                title: "Проверка завершена".to_owned(),
-                detail: format!(
-                    "Наблюдается {} устройств за {:.1} с",
-                    report.devices.len(),
-                    Duration::from_millis(report.duration_ms).as_secs_f64()
-                ),
+                title: language
+                    .pick("Проверка завершена", "Check complete")
+                    .to_owned(),
+                detail: match language {
+                    Language::Ru => format!(
+                        "Наблюдается {} устройств за {:.1} с",
+                        report.devices.len(),
+                        Duration::from_millis(report.duration_ms).as_secs_f64()
+                    ),
+                    Language::En => format!(
+                        "{} devices observed in {:.1} s",
+                        report.devices.len(),
+                        Duration::from_millis(report.duration_ms).as_secs_f64()
+                    ),
+                },
                 completed: 1,
                 total: 1,
             });

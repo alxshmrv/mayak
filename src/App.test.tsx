@@ -1,8 +1,16 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 
+function useSystemLanguages(languages: string[]) {
+  vi.spyOn(navigator, "languages", "get").mockReturnValue(languages);
+}
+
+afterEach(() => vi.restoreAllMocks());
+
 describe("Маяк", () => {
+  beforeEach(() => useSystemLanguages(["ru-RU"]));
+
   it("показывает понятный итог и сохраняет технические детали доступными", async () => {
     render(<App />);
 
@@ -87,5 +95,39 @@ describe("Маяк", () => {
 
     const devicesNav = screen.getByRole("button", { name: "Устройства" });
     expect(within(devicesNav).getByText("2")).toBeInTheDocument();
+  });
+});
+
+describe("Mayak in English", () => {
+  beforeEach(() => useSystemLanguages(["en-US", "en"]));
+
+  it("follows an English system language by default", async () => {
+    render(<App />);
+
+    expect(
+      await screen.findByRole("heading", { name: "Hotel Aurora" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("What to know")).toBeInTheDocument();
+    expect(screen.getByText("All network details")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Check network" })).toBeEnabled();
+    expect(screen.getByLabelText(/, Router$/)).toBeInTheDocument();
+    expect(document.documentElement.lang).toBe("en");
+    expect(document.title).toBe("Mayak");
+  });
+
+  it("switches the interface language from settings", async () => {
+    render(<App />);
+    await screen.findByRole("heading", { name: "Hotel Aurora" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    fireEvent.change(screen.getByRole("combobox", { name: /Interface language/ }), {
+      target: { value: "ru" },
+    });
+
+    expect(
+      await screen.findByRole("heading", { name: "Настройки" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: /Язык интерфейса/ })).toHaveValue("ru");
+    expect(document.documentElement.lang).toBe("ru");
   });
 });

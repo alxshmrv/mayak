@@ -1,0 +1,6 @@
+/* Shown by macOS in Finder, the Dock, and permission prompts. */
+"CFBundleDisplayName" = "Маяк";
+"CFBundleName" = "Маяк";
+"NSLocationUsageDescription" = "Маяку нужен доступ к геопозиции только потому, что macOS скрывает без него имя и идентификатор Wi‑Fi. Координаты не запрашиваются и не сохраняются.";
+"NSLocationWhenInUseUsageDescription" = "Маяку нужен доступ, чтобы показать имя и идентификатор текущей Wi‑Fi-сети. Координаты не запрашиваются и не сохраняются.";
+"NSLocalNetworkUsageDescription" = "Маяк безопасно ищет устройства только в текущей локальной сети и объясняет, какие из них удалось наблюдать.";
