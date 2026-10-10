@@ -1,6 +1,8 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
+use crate::i18n::{Language, LanguagePreference};
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct ChannelInfo {
@@ -228,6 +230,8 @@ pub struct AppSettings {
     pub default_scan_mode: ScanMode,
     pub notify_new_devices: bool,
     pub notify_network_changes: bool,
+    #[serde(default)]
+    pub language: LanguagePreference,
 }
 
 impl Default for AppSettings {
@@ -238,6 +242,7 @@ impl Default for AppSettings {
             default_scan_mode: ScanMode::Safe,
             notify_new_devices: false,
             notify_network_changes: false,
+            language: LanguagePreference::System,
         }
     }
 }
@@ -249,6 +254,7 @@ pub struct AppSnapshot {
     pub permissions: PermissionStatus,
     pub latest_report: Option<ScanReport>,
     pub settings: AppSettings,
+    pub system_language: Language,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

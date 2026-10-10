@@ -111,7 +111,7 @@ fn observe_wifi() -> AppResult<WifiObservation> {
         }
         Err(code) => {
             return Err(AppError::Platform(format!(
-                "Windows Native Wi-Fi вернул ошибку {code} при чтении подключения"
+                "Windows Native Wi-Fi returned error {code} while reading the connection"
             )));
         }
     };
@@ -155,7 +155,7 @@ fn observe_wifi() -> AppResult<WifiObservation> {
             channel: channel_number.map(|number| ChannelInfo {
                 number,
                 band: channel_band(center_frequency_mhz, number).to_owned(),
-                width: "не определена".to_owned(),
+                width: "unknown".to_owned(),
             }),
         },
         metadata_access_denied: false,
@@ -201,7 +201,7 @@ fn open_wlan_handle() -> AppResult<WlanHandle> {
         Ok(WlanHandle(handle))
     } else {
         Err(AppError::Platform(format!(
-            "Windows Native Wi-Fi недоступен: ошибка {code}"
+            "Windows Native Wi-Fi is unavailable: error {code}"
         )))
     }
 }
@@ -213,7 +213,7 @@ fn enumerate_interfaces(handle: &WlanHandle) -> AppResult<(Vec<WLAN_INTERFACE_IN
     let code = unsafe { WlanEnumInterfaces(handle.0, None, &raw mut pointer) };
     if code != 0 {
         return Err(AppError::Platform(format!(
-            "Не удалось перечислить Wi‑Fi-интерфейсы Windows: ошибка {code}"
+            "Could not enumerate Windows Wi‑Fi interfaces: error {code}"
         )));
     }
     let memory = WlanMemory(pointer.cast());
@@ -383,11 +383,11 @@ fn phy_mode(value: DOT11_PHY_TYPE) -> Option<&'static str> {
 
 fn channel_band(center_frequency_mhz: Option<u32>, channel: u16) -> &'static str {
     match center_frequency_mhz {
-        Some(frequency) if (2_400..=2_500).contains(&frequency) => "2,4 ГГц",
-        Some(frequency) if (5_000..=5_900).contains(&frequency) => "5 ГГц",
-        Some(frequency) if (5_925..=7_125).contains(&frequency) => "6 ГГц",
-        _ if channel <= 14 => "2,4 ГГц",
-        _ => "не определён",
+        Some(frequency) if (2_400..=2_500).contains(&frequency) => "2.4 GHz",
+        Some(frequency) if (5_000..=5_900).contains(&frequency) => "5 GHz",
+        Some(frequency) if (5_925..=7_125).contains(&frequency) => "6 GHz",
+        _ if channel <= 14 => "2.4 GHz",
+        _ => "unknown",
     }
 }
 
@@ -421,7 +421,7 @@ mod tests {
             mac_address([0x10, 0x20, 0x30, 0x40, 0x50, 0x60]).as_deref(),
             Some("10:20:30:40:50:60")
         );
-        assert_eq!(channel_band(Some(5_180), 36), "5 ГГц");
-        assert_eq!(channel_band(Some(5_955), 1), "6 ГГц");
+        assert_eq!(channel_band(Some(5_180), 36), "5 GHz");
+        assert_eq!(channel_band(Some(5_955), 1), "6 GHz");
     }
 }

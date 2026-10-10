@@ -1,0 +1,6 @@
+/* Shown by macOS in Finder, the Dock, and permission prompts. */
+"CFBundleDisplayName" = "Mayak";
+"CFBundleName" = "Mayak";
+"NSLocationUsageDescription" = "Mayak needs location access only because macOS hides the Wi‑Fi name and identifier without it. Coordinates are never requested or stored.";
+"NSLocationWhenInUseUsageDescription" = "Mayak needs access to show the name and identifier of the current Wi‑Fi network. Coordinates are never requested or stored.";
+"NSLocalNetworkUsageDescription" = "Mayak safely looks for devices only on the current local network and explains which of them it could observe.";

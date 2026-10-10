@@ -53,7 +53,7 @@ pub fn open_privacy_settings(section: &str) -> Result<(), String> {
     if status.success() {
         Ok(())
     } else {
-        Err("macOS не открыла настройки конфиденциальности".to_owned())
+        Err("macOS did not open Privacy & Security settings".to_owned())
     }
 }
 

@@ -5,7 +5,7 @@ use super::NativeWifiSnapshot;
 
 pub fn wifi_snapshot() -> AppResult<NativeWifiSnapshot> {
     Err(AppError::Platform(
-        "Эта операционная система пока не поддерживается".to_owned(),
+        "This operating system is not supported yet".to_owned(),
     ))
 }
 

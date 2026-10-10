@@ -50,7 +50,11 @@
     "longDescription": "Маяк показывает параметры текущей Wi-Fi-сети, безопасно обнаруживает доступные устройства и объясняет риски без отправки данных в облако.",
     "macOS": {
       "minimumSystemVersion": "15.0",
-      "signingIdentity": "-"
+      "signingIdentity": "-",
+      "files": {
+        "Resources/en.lproj/InfoPlist.strings": "macos/en.lproj/InfoPlist.strings",
+        "Resources/ru.lproj/InfoPlist.strings": "macos/ru.lproj/InfoPlist.strings"
+      }
     }
   },
   "plugins": {

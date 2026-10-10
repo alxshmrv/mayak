@@ -1,3 +1,5 @@
+import type { Language, LanguagePreference } from "./i18n";
+
 export type PermissionState =
   | "notDetermined"
   | "allowed"
@@ -146,6 +148,7 @@ export interface AppSettings {
   defaultScanMode: ScanMode;
   notifyNewDevices: boolean;
   notifyNetworkChanges: boolean;
+  language: LanguagePreference;
 }
 
 export interface AppSnapshot {
@@ -153,6 +156,7 @@ export interface AppSnapshot {
   permissions: PermissionStatus;
   latestReport?: ScanReport;
   settings: AppSettings;
+  systemLanguage: Language;
 }
 
 export interface ScanProgress {

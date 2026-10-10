@@ -58,7 +58,7 @@ export async function installPendingUpdate(
   onProgress: (progress: UpdateDownloadProgress) => void,
 ): Promise<void> {
   if (!pendingUpdate) {
-    throw new Error("Обновление больше недоступно. Проверьте обновления ещё раз.");
+    throw new Error("The update is no longer available. Check for updates again.");
   }
 
   let downloadedBytes = 0;

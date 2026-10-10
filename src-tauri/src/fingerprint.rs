@@ -7,6 +7,7 @@ use sha2::{Digest, Sha256};
 use crate::domain::{
     Confidence, DeviceKind, Finding, ObservedDevice, ServiceEvidence, Severity, TrustState,
 };
+use crate::i18n::Language;
 use crate::vendor::{is_locally_administered, vendor_for_mac};
 
 #[derive(Debug, Clone)]
@@ -63,18 +64,28 @@ impl RawDevice {
     }
 }
 
-pub fn finalize_device(raw: RawDevice, observed_at: DateTime<Utc>) -> ObservedDevice {
+pub fn finalize_device(
+    raw: RawDevice,
+    observed_at: DateTime<Utc>,
+    language: Language,
+) -> ObservedDevice {
     let mac_address = raw.mac_address.as_deref().map(normalize_mac);
     let vendor = mac_address.as_deref().and_then(vendor_for_mac);
     let uses_private_mac = mac_address.as_deref().is_some_and(is_locally_administered);
     let (kind, type_confidence) = infer_kind(&raw, vendor.as_deref());
-    let display_name = display_name(&raw, kind, vendor.as_deref());
+    let display_name = display_name(&raw, kind, vendor.as_deref(), language);
     let identity_key = identity_key(&raw, mac_address.as_deref());
-    let findings = device_findings(&raw, kind, vendor.as_deref());
+    let findings = device_findings(&raw, kind, vendor.as_deref(), language);
     let mut evidence = raw.evidence;
     if uses_private_mac {
-        evidence
-            .insert("Приватный MAC-адрес: производитель по IEEE OUI не определяется".to_owned());
+        evidence.insert(
+            language
+                .pick(
+                    "Приватный MAC-адрес: производитель по IEEE OUI не определяется",
+                    "Private MAC address: the IEEE OUI vendor cannot be determined",
+                )
+                .to_owned(),
+        );
     }
 
     ObservedDevice {
@@ -118,15 +129,31 @@ fn identity_key(raw: &RawDevice, mac: Option<&str>) -> String {
     }
     for service in &raw.services {
         hasher.update(service.protocol.as_bytes());
-        hasher.update(service.name.as_bytes());
+        hasher.update(identity_service_name(&service.name).as_bytes());
         hasher.update(service.port.unwrap_or_default().to_be_bytes());
     }
     format!("observed:{:x}", hasher.finalize())[..29].to_owned()
 }
 
-fn display_name(raw: &RawDevice, kind: DeviceKind, vendor: Option<&str>) -> String {
+/// Generic service names are localized, but MAC-less identities were hashed with
+/// the original Russian labels; hashing those keeps trust marks across languages.
+fn identity_service_name(name: &str) -> &str {
+    match name {
+        "HTTP / device" => "HTTP / устройство",
+        "TCP service" => "TCP-сервис",
+        "UPnP device" => "UPnP-устройство",
+        other => other,
+    }
+}
+
+fn display_name(
+    raw: &RawDevice,
+    kind: DeviceKind,
+    vendor: Option<&str>,
+    language: Language,
+) -> String {
     if raw.is_local_mac {
-        return "Этот компьютер".to_owned();
+        return language.pick("Этот компьютер", "This computer").to_owned();
     }
     if raw.is_router {
         if let Some(product) = upnp_product_name(raw) {
@@ -136,9 +163,12 @@ fn display_name(raw: &RawDevice, kind: DeviceKind, vendor: Option<&str>) -> Stri
             return hostname;
         }
         if let Some(vendor) = vendor {
-            return format!("{vendor} · шлюз сети");
+            return format!(
+                "{vendor} · {}",
+                language.pick("шлюз сети", "network gateway")
+            );
         }
-        return "Шлюз сети".to_owned();
+        return language.pick("Шлюз сети", "Network gateway").to_owned();
     }
     if let Some(hostname) = best_hostname(raw) {
         return hostname;
@@ -151,16 +181,18 @@ fn display_name(raw: &RawDevice, kind: DeviceKind, vendor: Option<&str>) -> Stri
         return clean_hostname(&service.name);
     }
     if let Some(vendor) = vendor {
-        return format!("{vendor} · {}", kind_label(kind));
+        return format!("{vendor} · {}", kind_label(kind, language));
     }
     if raw
         .mac_address
         .as_deref()
         .is_some_and(is_locally_administered)
     {
-        return "Устройство с приватным MAC".to_owned();
+        return language
+            .pick("Устройство с приватным MAC", "Device with a private MAC")
+            .to_owned();
     }
-    kind_label(kind).to_owned()
+    kind_label(kind, language).to_owned()
 }
 
 fn clean_hostname(value: &str) -> String {
@@ -385,16 +417,33 @@ fn infer_kind_from_hostname(hostname: &str) -> Option<DeviceKind> {
     .then_some(DeviceKind::Computer)
 }
 
-fn device_findings(raw: &RawDevice, kind: DeviceKind, vendor: Option<&str>) -> Vec<Finding> {
+fn device_findings(
+    raw: &RawDevice,
+    kind: DeviceKind,
+    vendor: Option<&str>,
+    language: Language,
+) -> Vec<Finding> {
+    let l = language;
     match kind {
         DeviceKind::Camera => vec![Finding {
             id: format!("camera-onvif-{}", raw.ip),
             category: "device".to_owned(),
             severity: Severity::High,
-            title: "Камера подтверждена протоколом".to_owned(),
-            description: "Устройство ответило на стандартный ONVIF/WS-Discovery запрос для сетевого видео.".to_owned(),
+            title: l
+                .pick("Камера подтверждена протоколом", "Camera confirmed by protocol")
+                .to_owned(),
+            description: l
+                .pick(
+                    "Устройство ответило на стандартный ONVIF/WS-Discovery запрос для сетевого видео.",
+                    "The device answered a standard ONVIF/WS-Discovery request for network video.",
+                )
+                .to_owned(),
             recommendation: Some(
-                "Проверьте владельца и расположение устройства. Маяк не подключался к видеопотоку и не выполнял авторизацию.".to_owned(),
+                l.pick(
+                    "Проверьте владельца и расположение устройства. Маяк не подключался к видеопотоку и не выполнял авторизацию.",
+                    "Check who owns the device and where it is. Mayak did not connect to the video stream or attempt to sign in.",
+                )
+                .to_owned(),
             ),
             evidence: vec![
                 "ONVIF NetworkVideoTransmitter".to_owned(),
@@ -402,18 +451,33 @@ fn device_findings(raw: &RawDevice, kind: DeviceKind, vendor: Option<&str>) -> V
             ],
         }],
         DeviceKind::PossibleCamera => {
-            let mut evidence = vec![format!("Открыт RTSP-порт 554 на {}", raw.ip)];
+            let mut evidence = vec![match l {
+                Language::Ru => format!("Открыт RTSP-порт 554 на {}", raw.ip),
+                Language::En => format!("RTSP port 554 is open on {}", raw.ip),
+            }];
             if let Some(vendor) = vendor {
-                evidence.push(format!("Производитель MAC: {vendor}"));
+                evidence.push(format!(
+                    "{}: {vendor}",
+                    l.pick("Производитель MAC", "MAC vendor")
+                ));
             }
             vec![Finding {
                 id: format!("camera-possible-{}", raw.ip),
                 category: "device".to_owned(),
                 severity: Severity::Warning,
-                title: "Возможно, IP-камера".to_owned(),
-                description: "Найдены признаки видеосервиса, но их недостаточно для категоричного определения устройства.".to_owned(),
+                title: l.pick("Возможно, IP-камера", "Possibly an IP camera").to_owned(),
+                description: l
+                    .pick(
+                        "Найдены признаки видеосервиса, но их недостаточно для категоричного определения устройства.",
+                        "Signs of a video service were found, but they are not enough to identify the device with certainty.",
+                    )
+                    .to_owned(),
                 recommendation: Some(
-                    "Сопоставьте устройство с оборудованием в помещении. Один RTSP-порт сам по себе не доказывает наличие камеры.".to_owned(),
+                    l.pick(
+                        "Сопоставьте устройство с оборудованием в помещении. Один RTSP-порт сам по себе не доказывает наличие камеры.",
+                        "Match the device against the equipment in the room. An RTSP port alone does not prove there is a camera.",
+                    )
+                    .to_owned(),
                 ),
                 evidence,
             }]
@@ -444,19 +508,20 @@ fn contains_any(haystack: &str, needles: &[&str]) -> bool {
     needles.iter().any(|needle| haystack.contains(needle))
 }
 
-pub fn kind_label(kind: DeviceKind) -> &'static str {
+pub fn kind_label(kind: DeviceKind, language: Language) -> &'static str {
+    let l = language;
     match kind {
-        DeviceKind::Router => "Маршрутизатор",
-        DeviceKind::Computer => "Компьютер",
-        DeviceKind::Phone => "Телефон",
-        DeviceKind::Tablet => "Планшет",
-        DeviceKind::Printer => "Принтер",
-        DeviceKind::Media => "Медиаустройство",
-        DeviceKind::SmartHome => "Умный дом",
-        DeviceKind::Camera => "IP-камера",
-        DeviceKind::PossibleCamera => "Видеоустройство",
-        DeviceKind::NetworkEquipment => "Сетевое оборудование",
-        DeviceKind::Unknown => "Неизвестное устройство",
+        DeviceKind::Router => l.pick("Маршрутизатор", "Router"),
+        DeviceKind::Computer => l.pick("Компьютер", "Computer"),
+        DeviceKind::Phone => l.pick("Телефон", "Phone"),
+        DeviceKind::Tablet => l.pick("Планшет", "Tablet"),
+        DeviceKind::Printer => l.pick("Принтер", "Printer"),
+        DeviceKind::Media => l.pick("Медиаустройство", "Media device"),
+        DeviceKind::SmartHome => l.pick("Умный дом", "Smart home"),
+        DeviceKind::Camera => l.pick("IP-камера", "IP camera"),
+        DeviceKind::PossibleCamera => l.pick("Видеоустройство", "Video device"),
+        DeviceKind::NetworkEquipment => l.pick("Сетевое оборудование", "Network equipment"),
+        DeviceKind::Unknown => l.pick("Неизвестное устройство", "Unknown device"),
     }
 }
 
@@ -468,6 +533,7 @@ mod tests {
 
     use super::{RawDevice, finalize_device};
     use crate::domain::{DeviceKind, ServiceEvidence};
+    use crate::i18n::Language;
 
     #[test]
     fn onvif_is_high_confidence_camera() {
@@ -481,7 +547,7 @@ mod tests {
             details: Vec::new(),
         });
 
-        let device = finalize_device(raw, Utc::now());
+        let device = finalize_device(raw, Utc::now(), Language::Ru);
         assert_eq!(device.kind, DeviceKind::Camera);
         assert_eq!(device.findings.len(), 1);
     }
@@ -490,7 +556,7 @@ mod tests {
     fn rtsp_alone_is_only_possible_camera() {
         let mut raw = RawDevice::new(Ipv4Addr::new(192, 168, 1, 30));
         raw.open_ports.insert(554);
-        let device = finalize_device(raw, Utc::now());
+        let device = finalize_device(raw, Utc::now(), Language::Ru);
         assert_eq!(device.kind, DeviceKind::PossibleCamera);
     }
 
@@ -498,7 +564,7 @@ mod tests {
     fn local_dns_name_becomes_the_visible_device_name() {
         let mut raw = RawDevice::new(Ipv4Addr::new(192, 168, 1, 40));
         raw.hostnames.insert("lab-thermostat.local.".to_owned());
-        let device = finalize_device(raw, Utc::now());
+        let device = finalize_device(raw, Utc::now(), Language::Ru);
         assert_eq!(device.display_name, "lab-thermostat");
         assert_eq!(device.kind, DeviceKind::SmartHome);
     }
@@ -514,7 +580,7 @@ mod tests {
             port: Some(445),
             details: Vec::new(),
         });
-        let device = finalize_device(raw, Utc::now());
+        let device = finalize_device(raw, Utc::now(), Language::Ru);
         assert_eq!(device.display_name, "Компьютер");
     }
 
@@ -532,7 +598,7 @@ mod tests {
             details: Vec::new(),
         });
 
-        let device = finalize_device(raw, Utc::now());
+        let device = finalize_device(raw, Utc::now(), Language::Ru);
         assert_eq!(device.display_name, "Archer C80");
         assert_eq!(device.vendor.as_deref(), Some("TP-Link"));
     }
@@ -550,7 +616,7 @@ mod tests {
             details: vec!["platform: cucumber".to_owned()],
         });
 
-        let device = finalize_device(raw, Utc::now());
+        let device = finalize_device(raw, Utc::now(), Language::Ru);
         assert_eq!(device.display_name, "Yandex Station Midi");
         assert_eq!(device.kind, DeviceKind::Media);
     }
@@ -568,7 +634,7 @@ mod tests {
             details: vec!["T: 1".to_owned()],
         });
 
-        let device = finalize_device(raw, Utc::now());
+        let device = finalize_device(raw, Utc::now(), Language::Ru);
         assert_eq!(device.display_name, "Intertech Services AG · Умный дом");
         assert_eq!(device.kind, DeviceKind::SmartHome);
     }
@@ -578,7 +644,7 @@ mod tests {
         let mut raw = RawDevice::new(Ipv4Addr::new(192, 168, 1, 108));
         raw.mac_address = Some("a2:e8:06:f2:e2:80".to_owned());
 
-        let device = finalize_device(raw, Utc::now());
+        let device = finalize_device(raw, Utc::now(), Language::Ru);
         assert_eq!(device.display_name, "Устройство с приватным MAC");
         assert!(device.vendor.is_none());
         assert!(
@@ -594,8 +660,43 @@ mod tests {
         let mut raw = RawDevice::new(Ipv4Addr::new(192, 168, 1, 105));
         raw.mac_address = Some("64:48:42:b4:7:ab".to_owned());
 
-        let device = finalize_device(raw, Utc::now());
+        let device = finalize_device(raw, Utc::now(), Language::Ru);
         assert_eq!(device.mac_address.as_deref(), Some("64:48:42:b4:07:ab"));
         assert_eq!(device.vendor.as_deref(), Some("Apple"));
+    }
+
+    #[test]
+    fn english_names_and_evidence_for_private_mac() {
+        let mut raw = RawDevice::new(Ipv4Addr::new(192, 168, 1, 108));
+        raw.mac_address = Some("a2:e8:06:f2:e2:80".to_owned());
+
+        let device = finalize_device(raw, Utc::now(), Language::En);
+        assert_eq!(device.display_name, "Device with a private MAC");
+        assert!(
+            device
+                .evidence
+                .iter()
+                .any(|item| item.starts_with("Private MAC address"))
+        );
+    }
+
+    #[test]
+    fn localized_generic_service_names_keep_the_same_identity() {
+        let service = |name: &str| ServiceEvidence {
+            protocol: "tcp".to_owned(),
+            name: name.to_owned(),
+            service_type: None,
+            port: Some(5000),
+            details: Vec::new(),
+        };
+        let mut russian = RawDevice::new(Ipv4Addr::new(192, 168, 1, 60));
+        russian.services.push(service("HTTP / устройство"));
+        let mut english = RawDevice::new(Ipv4Addr::new(192, 168, 1, 60));
+        english.services.push(service("HTTP / device"));
+
+        assert_eq!(
+            finalize_device(russian, Utc::now(), Language::Ru).identity_key,
+            finalize_device(english, Utc::now(), Language::En).identity_key
+        );
     }
 }

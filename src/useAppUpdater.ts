@@ -27,7 +27,8 @@ export interface AppUpdateState {
   downloadedBytes: number;
   totalBytes?: number;
   lastCheckedAt?: string;
-  error?: string;
+  /** The last check or install failed; the interface shows a localized message. */
+  error?: boolean;
   dialogOpen: boolean;
 }
 
@@ -37,9 +38,9 @@ const initialState: AppUpdateState = {
   dialogOpen: false,
 };
 
-function friendlyUpdateError(cause: unknown) {
+function reportUpdateError(cause: unknown) {
   console.warn("Mayak updater failed", cause);
-  return "Не удалось проверить или установить обновление. Проверьте интернет и повторите попытку.";
+  return true;
 }
 
 export function useAppUpdater() {
@@ -104,7 +105,7 @@ export function useAppUpdater() {
         phase: "failed",
         available: undefined,
         dialogOpen: false,
-        error: friendlyUpdateError(cause),
+        error: reportUpdateError(cause),
         lastCheckedAt: new Date().toISOString(),
       }));
     } finally {
@@ -153,7 +154,7 @@ export function useAppUpdater() {
       setState((current) => ({
         ...current,
         phase: "failed",
-        error: friendlyUpdateError(cause),
+        error: reportUpdateError(cause),
         dialogOpen: true,
       }));
     }

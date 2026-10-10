@@ -20,6 +20,7 @@ use crate::domain::{
 };
 use crate::error::{AppError, AppResult};
 use crate::fingerprint::{RawDevice, finalize_device};
+use crate::i18n::Language;
 use crate::network::selected_ipv4;
 use crate::platform;
 
@@ -38,8 +39,10 @@ pub struct DiscoveryOutput {
 pub async fn discover(
     context: &NetworkContext,
     mode: ScanMode,
+    language: Language,
     progress: Option<&UnboundedSender<ScanProgress>>,
 ) -> AppResult<DiscoveryOutput> {
+    let l = language;
     if !context.connected {
         return Err(AppError::NoWifi);
     }
@@ -70,8 +73,11 @@ pub async fn discover(
     send_progress(
         progress,
         "prepare",
-        "Определяем границы сети",
-        &format!("{} адресов в текущей Wi‑Fi-подсети", targets.len()),
+        l.pick("Определяем границы сети", "Mapping the network boundaries"),
+        &match l {
+            Language::Ru => format!("{} адресов в текущей Wi‑Fi-подсети", targets.len()),
+            Language::En => format!("{} addresses in the current Wi‑Fi subnet", targets.len()),
+        },
         0,
         targets.len(),
     );
@@ -80,9 +86,9 @@ pub async fn discover(
         ScanMode::Safe => Duration::from_millis(1_600),
         ScanMode::Deep => Duration::from_millis(2_600),
     };
-    let mdns_task = tokio::task::spawn_blocking(move || discover_mdns(mdns_duration));
-    let tcp_future = scan_tcp_targets(targets.clone(), mode, progress);
-    let ssdp_future = discover_ssdp(local_ip, mode);
+    let mdns_task = tokio::task::spawn_blocking(move || discover_mdns(mdns_duration, l));
+    let tcp_future = scan_tcp_targets(targets.clone(), mode, l, progress);
+    let ssdp_future = discover_ssdp(local_ip, mode, l);
     let onvif_future = discover_onvif(local_ip, mode);
 
     let (tcp_devices, ssdp_devices, onvif_devices, mdns_result) =
@@ -91,15 +97,18 @@ pub async fn discover(
     send_progress(
         progress,
         "neighbors",
-        "Сверяем соседей",
-        "Читаем ARP-таблицу после активных проверок",
+        l.pick("Сверяем соседей", "Cross-checking neighbors"),
+        l.pick(
+            "Читаем ARP-таблицу после активных проверок",
+            "Reading the ARP table after active checks",
+        ),
         targets.len(),
         targets.len(),
     );
 
     let interface_name = context.interface_name.clone();
     let arp_devices =
-        tokio::task::spawn_blocking(move || read_arp_table(interface_name.as_deref()))
+        tokio::task::spawn_blocking(move || read_arp_table(interface_name.as_deref(), l))
             .await
             .unwrap_or_default();
     let mdns_devices = mdns_result.unwrap_or_default();
@@ -113,9 +122,13 @@ pub async fn discover(
 
     let mut local = RawDevice::new(local_ip);
     local.is_local_mac = true;
-    local
-        .evidence
-        .insert("Локальный интерфейс этого компьютера".to_owned());
+    local.evidence.insert(
+        l.pick(
+            "Локальный интерфейс этого компьютера",
+            "This computer's local interface",
+        )
+        .to_owned(),
+    );
     local.mac_address.clone_from(&context.local_mac_address);
     merged
         .entry(local_ip)
@@ -131,11 +144,17 @@ pub async fn discover(
             .entry(router_ip)
             .or_insert_with(|| RawDevice::new(router_ip));
         router.is_router = true;
-        router.evidence.insert("Шлюз текущей Wi‑Fi-сети".to_owned());
+        router.evidence.insert(
+            l.pick(
+                "Шлюз текущей Wi‑Fi-сети",
+                "Gateway of the current Wi‑Fi network",
+            )
+            .to_owned(),
+        );
     }
 
     let dns_targets = merged.keys().copied().collect::<Vec<_>>();
-    let dns_devices = tokio::task::spawn_blocking(move || resolve_local_dns(dns_targets))
+    let dns_devices = tokio::task::spawn_blocking(move || resolve_local_dns(dns_targets, l))
         .await
         .unwrap_or_default();
     merge_records(&mut merged, dns_devices);
@@ -144,7 +163,7 @@ pub async fn discover(
     let mut devices = merged
         .into_values()
         .filter(|item| is_valid_observation(item, subnet))
-        .map(|item| finalize_device(item, observed_at))
+        .map(|item| finalize_device(item, observed_at, l))
         .collect::<Vec<_>>();
     devices.sort_by_key(|item| {
         let rank = match (item.kind, item.trust_state) {
@@ -161,19 +180,30 @@ pub async fn discover(
         .count();
     let mut notes = Vec::new();
     if limited_by_subnet_size {
-        notes.push(format!(
-            "Подсеть {subnet} больше безопасного лимита режима; проверена ближайшая область из {limit} адресов."
-        ));
+        notes.push(match l {
+            Language::Ru => format!(
+                "Подсеть {subnet} больше безопасного лимита режима; проверена ближайшая область из {limit} адресов."
+            ),
+            Language::En => format!(
+                "Subnet {subnet} exceeds this mode's safe limit; the nearest {limit} addresses were checked."
+            ),
+        });
     }
     if responsive_count <= 1 {
         notes.push(
-            "Другие клиенты почти не отвечают. Возможны client isolation, фильтрация или пустая сеть."
-                .to_owned(),
+            l.pick(
+                "Другие клиенты почти не отвечают. Возможны client isolation, фильтрация или пустая сеть.",
+                "Other clients barely respond. This may be client isolation, filtering, or an empty network.",
+            )
+            .to_owned(),
         );
     }
     notes.push(
-        "Молчащие устройства, другие VLAN и устройства за изоляцией могут быть невидимы."
-            .to_owned(),
+        l.pick(
+            "Молчащие устройства, другие VLAN и устройства за изоляцией могут быть невидимы.",
+            "Silent devices, other VLANs, and isolated devices may be invisible.",
+        )
+        .to_owned(),
     );
 
     Ok(DiscoveryOutput {
@@ -190,7 +220,7 @@ pub async fn discover(
             methods: vec![
                 "TCP connect".to_owned(),
                 "ARP cache".to_owned(),
-                "Локальный DNS".to_owned(),
+                l.pick("Локальный DNS", "Local DNS").to_owned(),
                 "Bonjour / mDNS".to_owned(),
                 "SSDP".to_owned(),
                 "ONVIF / WS-Discovery".to_owned(),
@@ -277,6 +307,7 @@ fn scan_targets(subnet: Ipv4Net, local_ip: Ipv4Addr, limit: usize) -> (Vec<Ipv4A
 async fn scan_tcp_targets(
     targets: Vec<Ipv4Addr>,
     mode: ScanMode,
+    language: Language,
     progress: Option<&UnboundedSender<ScanProgress>>,
 ) -> Vec<RawDevice> {
     let total = targets.len();
@@ -298,7 +329,7 @@ async fn scan_tcp_targets(
 
     let mut stream = stream::iter(targets.into_iter().map(|ip| {
         let connection_limit = Arc::clone(&connection_limit);
-        async move { probe_host(ip, ports, per_probe_timeout, connection_limit).await }
+        async move { probe_host(ip, ports, per_probe_timeout, connection_limit, language).await }
     }))
     .buffer_unordered(match mode {
         ScanMode::Safe => 64,
@@ -316,8 +347,14 @@ async fn scan_tcp_targets(
             send_progress(
                 progress,
                 "tcp",
-                "Ищем отвечающие устройства",
-                &format!("Проверено {completed} из {total} адресов"),
+                language.pick(
+                    "Ищем отвечающие устройства",
+                    "Looking for responding devices",
+                ),
+                &match language {
+                    Language::Ru => format!("Проверено {completed} из {total} адресов"),
+                    Language::En => format!("Checked {completed} of {total} addresses"),
+                },
                 completed,
                 total,
             );
@@ -331,6 +368,7 @@ async fn probe_host(
     ports: &'static [u16],
     probe_timeout: Duration,
     connection_limit: Arc<Semaphore>,
+    language: Language,
 ) -> Option<RawDevice> {
     let started = Instant::now();
     let attempts = stream::iter(ports.iter().copied().map(|port| {
@@ -360,15 +398,20 @@ async fn probe_host(
     let mut record = RawDevice::new(ip);
     record.response_time_ms =
         Some(u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX));
-    record
-        .evidence
-        .insert("Устройство ответило на TCP-проверку".to_owned());
+    record.evidence.insert(
+        language
+            .pick(
+                "Устройство ответило на TCP-проверку",
+                "The device responded to a TCP check",
+            )
+            .to_owned(),
+    );
     for (port, open, _) in attempts {
         if open {
             record.open_ports.insert(port);
             record.services.push(ServiceEvidence {
                 protocol: "tcp".to_owned(),
-                name: tcp_service_name(port).to_owned(),
+                name: tcp_service_name(port, language).to_owned(),
                 service_type: None,
                 port: Some(port),
                 details: Vec::new(),
@@ -378,7 +421,7 @@ async fn probe_host(
     Some(record)
 }
 
-fn read_arp_table(interface_name: Option<&str>) -> Vec<RawDevice> {
+fn read_arp_table(interface_name: Option<&str>, language: Language) -> Vec<RawDevice> {
     platform::read_neighbors(interface_name)
         .into_iter()
         .filter_map(|neighbor| {
@@ -387,29 +430,39 @@ fn read_arp_table(interface_name: Option<&str>) -> Vec<RawDevice> {
             }
             let mut record = RawDevice::new(neighbor.ip);
             record.mac_address = Some(neighbor.mac_address);
-            record
-                .evidence
-                .insert("MAC-адрес найден в таблице соседей (ARP)".to_owned());
+            record.evidence.insert(
+                language
+                    .pick(
+                        "MAC-адрес найден в таблице соседей (ARP)",
+                        "MAC address found in the neighbor table (ARP)",
+                    )
+                    .to_owned(),
+            );
             Some(record)
         })
         .collect()
 }
 
-fn resolve_local_dns(ips: Vec<Ipv4Addr>) -> Vec<RawDevice> {
+fn resolve_local_dns(ips: Vec<Ipv4Addr>, language: Language) -> Vec<RawDevice> {
     ips.into_iter()
         .filter_map(|ip| {
             let hostname = platform::resolve_hostname(ip)?;
             let mut record = RawDevice::new(ip);
             record.hostnames.insert(hostname);
-            record
-                .evidence
-                .insert("Имя получено через локальный DNS".to_owned());
+            record.evidence.insert(
+                language
+                    .pick(
+                        "Имя получено через локальный DNS",
+                        "Name resolved through local DNS",
+                    )
+                    .to_owned(),
+            );
             Some(record)
         })
         .collect()
 }
 
-fn discover_mdns(duration: Duration) -> Vec<RawDevice> {
+fn discover_mdns(duration: Duration, language: Language) -> Vec<RawDevice> {
     let Ok(daemon) = ServiceDaemon::new() else {
         return Vec::new();
     };
@@ -479,7 +532,7 @@ fn discover_mdns(duration: Duration) -> Vec<RawDevice> {
                         name: service_instance_name(info.get_fullname()),
                         service_type: Some((*service_type).to_owned()),
                         port: Some(info.get_port()),
-                        details: mdns_txt_details(&info),
+                        details: mdns_txt_details(&info, language),
                     });
                     record.evidence.insert(format!("Bonjour: {service_type}"));
                 }
@@ -517,14 +570,14 @@ fn is_dns_sd_label_character(character: char) -> bool {
     character.is_ascii_alphanumeric() || matches!(character, '_' | '-')
 }
 
-fn mdns_txt_details(info: &mdns_sd::ResolvedService) -> Vec<String> {
+fn mdns_txt_details(info: &mdns_sd::ResolvedService, language: Language) -> Vec<String> {
     info.get_properties()
         .iter()
         .take(16)
         .map(|property| {
             let key = property.key();
             if is_sensitive_metadata_key(key) {
-                return format!("{key}: [скрыто]");
+                return format!("{key}: [{}]", language.pick("скрыто", "hidden"));
             }
             let value = property
                 .val_str()
@@ -555,7 +608,7 @@ fn is_sensitive_metadata_key(key: &str) -> bool {
     .any(|needle| lower.contains(needle))
 }
 
-async fn discover_ssdp(local_ip: Ipv4Addr, mode: ScanMode) -> Vec<RawDevice> {
+async fn discover_ssdp(local_ip: Ipv4Addr, mode: ScanMode, language: Language) -> Vec<RawDevice> {
     let Ok(socket) = UdpSocket::bind(SocketAddr::new(IpAddr::V4(local_ip), 0)).await else {
         return Vec::new();
     };
@@ -599,7 +652,7 @@ async fn discover_ssdp(local_ip: Ipv4Addr, mode: ScanMode) -> Vec<RawDevice> {
             .get("server")
             .or_else(|| headers.get("st"))
             .cloned()
-            .unwrap_or_else(|| "UPnP-устройство".to_owned());
+            .unwrap_or_else(|| language.pick("UPnP-устройство", "UPnP device").to_owned());
         let mut details = Vec::new();
         for key in ["st", "usn", "location"] {
             if let Some(value) = headers.get(key) {
@@ -620,9 +673,14 @@ async fn discover_ssdp(local_ip: Ipv4Addr, mode: ScanMode) -> Vec<RawDevice> {
             port: None,
             details,
         });
-        record
-            .evidence
-            .insert("Устройство ответило на SSDP/UPnP".to_owned());
+        record.evidence.insert(
+            language
+                .pick(
+                    "Устройство ответило на SSDP/UPnP",
+                    "The device responded to SSDP/UPnP",
+                )
+                .to_owned(),
+        );
     }
     records.into_values().collect()
 }
@@ -727,7 +785,7 @@ fn service_instance_name(fullname: &str) -> String {
         .replace("\\032", " ")
 }
 
-fn tcp_service_name(port: u16) -> &'static str {
+fn tcp_service_name(port: u16, language: Language) -> &'static str {
     match port {
         21 => "FTP",
         22 => "SSH",
@@ -740,12 +798,12 @@ fn tcp_service_name(port: u16) -> &'static str {
         548 => "AFP",
         554 => "RTSP",
         631 => "IPP",
-        5000 => "HTTP / устройство",
+        5000 => language.pick("HTTP / устройство", "HTTP / device"),
         7000 => "AirPlay / HTTP",
         8009 => "Google Cast",
         9100 => "JetDirect",
         32400 => "Plex",
-        _ => "TCP-сервис",
+        _ => language.pick("TCP-сервис", "TCP service"),
     }
 }
 
@@ -839,6 +897,7 @@ mod tests {
         let output = Box::pin(super::discover(
             &context,
             crate::domain::ScanMode::Safe,
+            crate::i18n::Language::Ru,
             None,
         ))
         .await

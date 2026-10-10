@@ -4,6 +4,7 @@ mod domain;
 mod engine;
 mod error;
 mod fingerprint;
+mod i18n;
 mod native;
 mod network;
 mod platform;
@@ -16,7 +17,8 @@ use std::time::{Duration, Instant};
 
 use commands::AppState;
 use engine::ScanEngine;
-use tauri::menu::{MenuBuilder, MenuItemBuilder};
+use i18n::Language;
+use tauri::menu::{MenuBuilder, MenuItem, MenuItemBuilder};
 use tauri::plugin::PermissionState;
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{Emitter, Manager, WindowEvent};
@@ -56,7 +58,12 @@ pub fn run() {
                 engine: Arc::clone(&engine),
             });
 
-            configure_tray(app)?;
+            let language = storage.settings().map_or_else(
+                |_| Language::system(),
+                |settings| settings.language.resolve(),
+            );
+            configure_tray(app, language)?;
+            apply_language(app.handle(), language);
             start_background_monitor(app.handle().clone(), storage, engine);
             Ok(())
         })
@@ -78,19 +85,56 @@ pub fn run() {
             commands::open_privacy_settings,
         ])
         .run(tauri::generate_context!())
-        .expect("Маяк не смог запустить интерфейс");
+        .expect("Mayak could not start the user interface");
 }
 
-fn configure_tray<R: tauri::Runtime>(app: &mut tauri::App<R>) -> tauri::Result<()> {
-    let open = MenuItemBuilder::with_id("open", "Открыть Маяк").build(app)?;
-    let scan = MenuItemBuilder::with_id("scan", "Быстрая проверка").build(app)?;
-    let quit = MenuItemBuilder::with_id("quit", "Завершить").build(app)?;
+const TRAY_ID: &str = "main";
+
+struct TrayMenu {
+    open: MenuItem<tauri::Wry>,
+    scan: MenuItem<tauri::Wry>,
+    quit: MenuItem<tauri::Wry>,
+}
+
+fn app_name(language: Language) -> &'static str {
+    language.pick("Маяк", "Mayak")
+}
+
+fn tray_labels(language: Language) -> [&'static str; 3] {
+    match language {
+        Language::Ru => ["Открыть Маяк", "Быстрая проверка", "Завершить"],
+        Language::En => ["Open Mayak", "Quick check", "Quit"],
+    }
+}
+
+/// Renames the window, tray tooltip, and tray menu to match the interface language.
+pub(crate) fn apply_language(app: &tauri::AppHandle, language: Language) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.set_title(app_name(language));
+    }
+    if let Some(tray) = app.tray_by_id(TRAY_ID) {
+        let _ = tray.set_tooltip(Some(app_name(language)));
+    }
+    if let Some(menu) = app.try_state::<TrayMenu>() {
+        let [open, scan, quit] = tray_labels(language);
+        let _ = menu.open.set_text(open);
+        let _ = menu.scan.set_text(scan);
+        let _ = menu.quit.set_text(quit);
+    }
+}
+
+fn configure_tray(app: &mut tauri::App, language: Language) -> tauri::Result<()> {
+    let [open_label, scan_label, quit_label] = tray_labels(language);
+    let open = MenuItemBuilder::with_id("open", open_label).build(app)?;
+    let scan = MenuItemBuilder::with_id("scan", scan_label).build(app)?;
+    let quit = MenuItemBuilder::with_id("quit", quit_label).build(app)?;
     let menu = MenuBuilder::new(app)
         .items(&[&open, &scan, &quit])
         .build()?;
+    app.manage(TrayMenu { open, scan, quit });
 
-    let mut builder = TrayIconBuilder::new()
-        .tooltip("Маяк")
+    let mut builder = TrayIconBuilder::with_id(TRAY_ID)
+        .tooltip(app_name(language))
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id().as_ref() {
@@ -145,9 +189,10 @@ fn start_background_monitor(
                 continue;
             }
             last_scan = Instant::now();
-            match Box::pin(engine.scan(settings.default_scan_mode, None)).await {
+            let language = settings.language.resolve();
+            match Box::pin(engine.scan(settings.default_scan_mode, language, None)).await {
                 Ok(report) => {
-                    notify_for_report(&app, &settings, &report);
+                    notify_for_report(&app, &settings, &report, language);
                     let _ = app.emit("monitor-report", report);
                 }
                 Err(error) => {
@@ -162,7 +207,9 @@ fn notify_for_report(
     app: &tauri::AppHandle,
     settings: &domain::AppSettings,
     report: &domain::ScanReport,
+    language: Language,
 ) {
+    let network_name = report.network.ssid.as_deref().unwrap_or("Wi-Fi");
     let new_devices = report
         .devices
         .iter()
@@ -174,15 +221,19 @@ fn notify_for_report(
         .iter()
         .any(|finding| finding.category == "change");
     let body = if settings.notify_new_devices && new_devices > 0 {
-        Some(format!(
-            "В сети «{}» новых устройств: {new_devices}",
-            report.network.ssid.as_deref().unwrap_or("Wi-Fi")
-        ))
+        Some(match language {
+            Language::Ru => format!("В сети «{network_name}» новых устройств: {new_devices}"),
+            Language::En => format!("New devices on “{network_name}”: {new_devices}"),
+        })
     } else if settings.notify_network_changes && network_changed {
-        Some(format!(
-            "Изменились параметры сети «{}». Откройте Маяк, чтобы сверить детали.",
-            report.network.ssid.as_deref().unwrap_or("Wi-Fi")
-        ))
+        Some(match language {
+            Language::Ru => format!(
+                "Изменились параметры сети «{network_name}». Откройте Маяк, чтобы сверить детали."
+            ),
+            Language::En => format!(
+                "Settings of “{network_name}” have changed. Open Mayak to review the details."
+            ),
+        })
     } else {
         None
     };
@@ -194,7 +245,12 @@ fn notify_for_report(
     if notifications.permission_state().ok() != Some(PermissionState::Granted) {
         return;
     }
-    if let Err(error) = notifications.builder().title("Маяк").body(body).show() {
+    if let Err(error) = notifications
+        .builder()
+        .title(app_name(language))
+        .body(body)
+        .show()
+    {
         tracing::warn!("notification skipped: {error}");
     }
 }

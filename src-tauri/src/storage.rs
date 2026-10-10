@@ -473,6 +473,7 @@ mod tests {
         Severity, TrustState, VisibilityLevel,
     };
     use crate::fingerprint::{RawDevice, finalize_device};
+    use crate::i18n::{Language, LanguagePreference};
     use crate::network::stable_network_id;
 
     fn report_with_network_id(network_id: &str) -> ScanReport {
@@ -510,6 +511,7 @@ mod tests {
             devices: vec![finalize_device(
                 RawDevice::new(Ipv4Addr::new(192, 168, 1, 42)),
                 now,
+                Language::Ru,
             )],
             assessment: Assessment {
                 risk: Severity::Info,
@@ -541,6 +543,7 @@ mod tests {
             default_scan_mode: ScanMode::Deep,
             notify_new_devices: false,
             notify_network_changes: true,
+            language: LanguagePreference::En,
         };
 
         storage.save_settings(&settings).expect("save settings");
@@ -548,10 +551,20 @@ mod tests {
     }
 
     #[test]
+    fn settings_saved_before_localization_default_to_system_language() {
+        let legacy = r#"{"backgroundMonitoring":true,"monitoringIntervalSeconds":300,"defaultScanMode":"safe","notifyNewDevices":false,"notifyNetworkChanges":false}"#;
+        let settings: AppSettings = serde_json::from_str(legacy).expect("legacy settings");
+        assert_eq!(settings.language, LanguagePreference::System);
+    }
+
+    #[test]
     fn device_first_seen_is_scoped_to_the_wifi_network() {
         let storage = Storage::in_memory().expect("in-memory database");
-        let mut device =
-            finalize_device(RawDevice::new(Ipv4Addr::new(192, 168, 1, 42)), Utc::now());
+        let mut device = finalize_device(
+            RawDevice::new(Ipv4Addr::new(192, 168, 1, 42)),
+            Utc::now(),
+            Language::Ru,
+        );
         storage
             .connection
             .lock()
@@ -581,8 +594,11 @@ mod tests {
     #[test]
     fn device_trust_is_scoped_to_the_wifi_network() {
         let storage = Storage::in_memory().expect("in-memory database");
-        let mut home_device =
-            finalize_device(RawDevice::new(Ipv4Addr::new(192, 168, 1, 42)), Utc::now());
+        let mut home_device = finalize_device(
+            RawDevice::new(Ipv4Addr::new(192, 168, 1, 42)),
+            Utc::now(),
+            Language::Ru,
+        );
         let mut hotel_device = home_device.clone();
 
         storage

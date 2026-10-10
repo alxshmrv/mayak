@@ -15,5 +15,5 @@ pub fn resolve_hostname(_ip: Ipv4Addr) -> Option<String> {
 }
 
 pub fn open_privacy_settings(_section: &str) -> Result<(), String> {
-    Err("Настройки этой операционной системы пока не поддерживаются".to_owned())
+    Err("System settings are not supported on this operating system yet".to_owned())
 }
