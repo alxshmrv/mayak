@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::io::ErrorKind;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::Arc;
@@ -22,6 +22,9 @@ use crate::error::{AppError, AppResult};
 use crate::fingerprint::{RawDevice, finalize_device};
 use crate::network::selected_ipv4;
 use crate::platform;
+
+const DNS_SD_META_SERVICE_TYPE: &str = "_services._dns-sd._udp.local.";
+const MAX_DNS_SD_SERVICE_TYPES: usize = 64;
 
 pub struct DiscoveryOutput {
     pub devices: Vec<ObservedDevice>,
@@ -410,7 +413,7 @@ fn discover_mdns(duration: Duration) -> Vec<RawDevice> {
     let Ok(daemon) = ServiceDaemon::new() else {
         return Vec::new();
     };
-    let service_types = [
+    let baseline_service_types = [
         "_http._tcp.local.",
         "_https._tcp.local.",
         "_workstation._tcp.local.",
@@ -427,23 +430,45 @@ fn discover_mdns(duration: Duration) -> Vec<RawDevice> {
         "_rtsp._tcp.local.",
         "_hap._tcp.local.",
     ];
+    let mut service_types = baseline_service_types
+        .iter()
+        .map(ToString::to_string)
+        .collect::<BTreeSet<_>>();
+
+    if let Ok(receiver) = daemon.browse(DNS_SD_META_SERVICE_TYPE) {
+        let enumeration_window = duration.min(Duration::from_millis(700));
+        let deadline = Instant::now() + enumeration_window;
+        while Instant::now() < deadline && service_types.len() < MAX_DNS_SD_SERVICE_TYPES {
+            if let Ok(ServiceEvent::ServiceFound(_, fullname)) =
+                receiver.recv_timeout(Duration::from_millis(20))
+                && is_browsable_service_type(&fullname)
+            {
+                service_types.insert(fullname.to_ascii_lowercase());
+            }
+        }
+        let _ = daemon.stop_browse(DNS_SD_META_SERVICE_TYPE);
+    }
+
     let receivers = service_types
         .iter()
         .filter_map(|service_type| {
             daemon
                 .browse(service_type)
                 .ok()
-                .map(|receiver| (*service_type, receiver))
+                .map(|receiver| (service_type.as_str(), receiver))
         })
         .collect::<Vec<_>>();
     let deadline = Instant::now() + duration;
     let mut records = BTreeMap::<Ipv4Addr, RawDevice>::new();
 
     while Instant::now() < deadline {
+        let mut received_event = false;
         for (service_type, receiver) in &receivers {
-            if let Ok(ServiceEvent::ServiceResolved(info)) =
-                receiver.recv_timeout(Duration::from_millis(12))
-            {
+            while let Ok(event) = receiver.try_recv() {
+                received_event = true;
+                let ServiceEvent::ServiceResolved(info) = event else {
+                    continue;
+                };
                 for address in info.get_addresses_v4() {
                     let record = records
                         .entry(address)
@@ -454,19 +479,80 @@ fn discover_mdns(duration: Duration) -> Vec<RawDevice> {
                         name: service_instance_name(info.get_fullname()),
                         service_type: Some((*service_type).to_owned()),
                         port: Some(info.get_port()),
-                        details: Vec::new(),
+                        details: mdns_txt_details(&info),
                     });
                     record.evidence.insert(format!("Bonjour: {service_type}"));
                 }
             }
         }
+        if !received_event {
+            std::thread::sleep(Duration::from_millis(8));
+        }
     }
 
-    for service_type in service_types {
+    for service_type in &service_types {
         let _ = daemon.stop_browse(service_type);
     }
     let _ = daemon.shutdown();
     records.into_values().collect()
+}
+
+fn is_browsable_service_type(value: &str) -> bool {
+    let lower = value.to_ascii_lowercase();
+    if lower.len() > 255 || !lower.ends_with(".local.") || lower == "_services._dns-sd._udp.local."
+    {
+        return false;
+    }
+    let labels = lower.trim_end_matches('.').split('.').collect::<Vec<_>>();
+    labels.len() == 3
+        && labels[0].starts_with('_')
+        && matches!(labels[1], "_tcp" | "_udp")
+        && labels[2] == "local"
+        && labels[..2]
+            .iter()
+            .all(|label| label.len() <= 63 && label.chars().all(is_dns_sd_label_character))
+}
+
+fn is_dns_sd_label_character(character: char) -> bool {
+    character.is_ascii_alphanumeric() || matches!(character, '_' | '-')
+}
+
+fn mdns_txt_details(info: &mdns_sd::ResolvedService) -> Vec<String> {
+    info.get_properties()
+        .iter()
+        .take(16)
+        .map(|property| {
+            let key = property.key();
+            if is_sensitive_metadata_key(key) {
+                return format!("{key}: [скрыто]");
+            }
+            let value = property
+                .val_str()
+                .chars()
+                .filter(|character| !character.is_control())
+                .take(160)
+                .collect::<String>();
+            if value.is_empty() {
+                key.to_owned()
+            } else {
+                format!("{key}: {value}")
+            }
+        })
+        .collect()
+}
+
+fn is_sensitive_metadata_key(key: &str) -> bool {
+    let lower = key.to_ascii_lowercase();
+    [
+        "password",
+        "passwd",
+        "token",
+        "secret",
+        "credential",
+        "auth",
+    ]
+    .iter()
+    .any(|needle| lower.contains(needle))
 }
 
 async fn discover_ssdp(local_ip: Ipv4Addr, mode: ScanMode) -> Vec<RawDevice> {
@@ -688,7 +774,10 @@ mod tests {
 
     use ipnet::Ipv4Net;
 
-    use super::{RawDevice, extract_onvif_addresses, is_valid_observation, scan_targets};
+    use super::{
+        RawDevice, extract_onvif_addresses, is_browsable_service_type, is_sensitive_metadata_key,
+        is_valid_observation, scan_targets,
+    };
 
     #[test]
     fn safe_scan_covers_a_whole_slash_24() {
@@ -723,5 +812,65 @@ mod tests {
             extract_onvif_addresses(response),
             vec!["XAddr: http://192.0.2.9/onvif/device_service"]
         );
+    }
+
+    #[test]
+    fn accepts_dynamic_dns_sd_types_but_not_meta_or_malformed_names() {
+        assert!(is_browsable_service_type("_yandexio._tcp.local."));
+        assert!(is_browsable_service_type("_matter._udp.local."));
+        assert!(!is_browsable_service_type("_services._dns-sd._udp.local."));
+        assert!(!is_browsable_service_type("_http._sctp.local."));
+        assert!(!is_browsable_service_type("_http._tcp.example.com."));
+    }
+
+    #[test]
+    fn sensitive_txt_keys_are_redacted() {
+        assert!(is_sensitive_metadata_key("accessToken"));
+        assert!(is_sensitive_metadata_key("wifi_password"));
+        assert!(!is_sensitive_metadata_key("deviceId"));
+        assert!(!is_sensitive_metadata_key("model"));
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    #[ignore = "uses the developer machine's current local network"]
+    async fn live_scan_diagnostic() {
+        let context =
+            crate::network::collect_network_context().expect("collect current network context");
+        let output = Box::pin(super::discover(
+            &context,
+            crate::domain::ScanMode::Safe,
+            None,
+        ))
+        .await
+        .expect("scan current network");
+
+        println!(
+            "network={:?} devices={} mdns={} ssdp={} arp={}",
+            context.ssid,
+            output.devices.len(),
+            output.coverage.mdns_count,
+            output.coverage.ssdp_count,
+            output.coverage.arp_count
+        );
+        for device in output.devices {
+            println!(
+                "{} | {} | {:?} | vendor={:?} | hostnames={:?} | services={:?}",
+                device.ip_addresses.join(","),
+                device.display_name,
+                device.kind,
+                device.vendor,
+                device.hostnames,
+                device
+                    .services
+                    .iter()
+                    .map(|service| (
+                        service.protocol.as_str(),
+                        service.service_type.as_deref(),
+                        service.name.as_str(),
+                        service.details.as_slice(),
+                    ))
+                    .collect::<Vec<_>>()
+            );
+        }
     }
 }

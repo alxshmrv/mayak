@@ -9,6 +9,7 @@ mod network;
 mod platform;
 mod risk;
 mod storage;
+mod vendor;
 
 use std::sync::Arc;
 use std::time::{Duration, Instant};

@@ -24,6 +24,7 @@
     "test:release": "node --test scripts/*.test.mjs",
     "test:watch": "vitest",
     "lint": "eslint . --max-warnings 0",
+    "data:ieee": "node scripts/update-ieee-registries.mjs",
     "tauri": "tauri",
     "check": "npm run lint && npm run test && npm run test:release && npm run build"
   },
