@@ -8,6 +8,14 @@
 - [ ] `cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check`
 - [ ] `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings`
 - [ ] `cargo test --manifest-path src-tauri/Cargo.toml --all-targets`
+- [ ] Платформенная интеграция проверена на macOS и Windows или явно отмечена
+      как platform-specific.
+
+## Документация и релиз
+
+- [ ] Пользовательское изменение добавлено в `CHANGELOG.md`.
+- [ ] Различия macOS и Windows отражены в документации.
+- [ ] Для релиза проверены имена установщиков и соседние `.sha256`-файлы.
 
 ## Безопасность и приватность
 

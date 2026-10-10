@@ -21,6 +21,10 @@ MIT, но эта лицензия не заменяет лицензии зав�
 | mdns-sd | локальное обнаружение | MIT OR Apache-2.0 |
 | windows-rs | Windows Native Wi-Fi, IP Helper и системные API | MIT OR Apache-2.0 |
 
+`windows-rs` входит только в Windows-сборку. CoreWLAN, CoreLocation и другие
+Apple frameworks являются системными компонентами macOS и не поставляются
+внутри приложения как сторонние библиотеки.
+
 Среди транзитивных зависимостей также встречаются MPL-2.0, CC-BY-4.0,
 CC0-1.0, Unicode-3.0, BlueOak-1.0.0, 0BSD, Zlib, BSD, ISC, Unlicense и
 Apache-2.0 WITH LLVM-exception. В частности:
