@@ -1,4 +1,6 @@
-# Маяк
+# Mayak
+
+**English** · [Русский](README.ru.md)
 
 [![CI](https://github.com/alxshmrv/mayak/actions/workflows/ci.yml/badge.svg)](https://github.com/alxshmrv/mayak/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/alxshmrv/mayak?include_prereleases&label=release)](https://github.com/alxshmrv/mayak/releases)
@@ -7,105 +9,127 @@
 [![Rust 1.88+](https://img.shields.io/badge/Rust-1.88%2B-dea584?logo=rust)](https://www.rust-lang.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-786ee8.svg)](LICENSE)
 
-Локальный центр доверия к Wi‑Fi для macOS и Windows. Маяк объясняет состояние
-текущей сети, показывает наблюдаемые устройства и помогает заметить новых
-соседей — без аккаунта, облака и отправки сетевых данных наружу.
+**A local-first Wi‑Fi trust center for macOS and Windows.** Mayak explains the
+state of the network you are connected to, shows the devices it can observe
+around you, and helps you notice new neighbors — with no account, no cloud,
+and no network data leaving your computer.
 
-Системная часть написана на Rust и Tauri 2, интерфейс — на React.
+The system layer is written in Rust on top of Tauri 2; the interface is React.
+The app is available in English and Russian. *Mayak* (Russian: «Маяк») means
+*lighthouse*.
 
-![Обзор сети в Маяке](docs/images/overview.png)
+![Network overview in Mayak](docs/images/overview-en.png)
 
-> Используйте Маяк только в сетях, которыми вы владеете, управляете или имеете
-> явное разрешение проверять. Приложение предназначено для защитной
-> диагностики: оно не подбирает пароли, не эксплуатирует устройства и не
-> обходит контроль доступа.
+> Only use Mayak on networks you own, administer, or have explicit permission
+> to inspect. It is a defensive diagnostic tool: it does not crack passwords,
+> exploit devices, or bypass access controls.
 
-## Возможности
+## Why Mayak
 
-- SSID, BSSID, защита, канал, диапазон, RSSI, скорость соединения и другие
-  параметры, которые раскрывает текущая операционная система;
-- IP-адреса, подсеть, шлюз, DNS, прокси и признаки активного VPN;
-- обнаружение через ARP, динамическое перечисление DNS-SD/mDNS, SSDP/UPnP,
-  ONVIF и ограниченные TCP-проверки только в текущей локальной подсети;
-- объединение IP, MAC, производителя, локальных имён, сервисов, портов и
-  наблюдений в одну карточку устройства;
-- локальное определение производителя по встроенному снимку публичных
-  реестров IEEE MA-L, MA-M и MA-S без отправки MAC-адресов наружу;
-- понятные статусы «моё», «знакомое», «игнорировать» и уведомления о новых
-  устройствах;
-- отдельные оценки риска сети, полноты наблюдения и уверенности вывода;
-- локальная история для каждой сети и фоновый мониторинг;
-- автоматическая проверка подписанных обновлений с подтверждением перед
-  установкой и перезапуском;
-- явное различие между подтверждённой и возможной камерой;
-- анимированный маскот — краб Ferris, который реагирует на состояние проверки.
+Joining a hotel, airport, office, or a friend's Wi‑Fi usually leaves the same
+questions unanswered: is this network configured sensibly, what else is on it,
+and did something new just show up? Network scanners answer with raw tables
+built for administrators. Mayak answers in plain language first — a verdict
+you can read in seconds — and keeps the evidence and full technical details
+one click away.
 
-![Список видимых устройств](docs/images/devices.png)
+It is built around a few principles:
 
-Имена устройств появляются только тогда, когда сеть или само устройство
-объявляет их через локальный DNS, Bonjour/mDNS, SSDP или SMB. Маяк сначала
-перечисляет доступные DNS-SD-типы, а затем разрешает найденные сервисы и их
-TXT-метаданные — поэтому он не ограничен коротким списком известных
-протоколов. Если надёжного имени нет, приложение показывает производителя,
-наблюдаемые адреса и уровень уверенности, не выдумывая конкретную модель или
-тип устройства.
+- **Conclusion first, evidence second.** Every finding links back to what was
+  actually observed.
+- **Never promise the invisible.** Client isolation, filtering, and missing OS
+  permissions are shown as limits on the result, not hidden.
+- **Three separate scores.** Network risk, observation coverage, and
+  confidence are reported independently instead of being collapsed into one
+  opaque number.
+- **Your data stays local.** Active probing is restricted to the current
+  Wi‑Fi subnet, and nothing is uploaded anywhere.
 
-## Честные ограничения
+## Features
 
-Маяк показывает только то, что этот компьютер действительно может наблюдать.
-Client isolation в отеле, отдельные VLAN, фильтрация multicast, спящие
-устройства, межсетевой экран и рандомизация MAC могут скрыть соседей или
-изменить их идентичность. Отсутствие найденной камеры не доказывает отсутствие
-камеры в помещении или сети.
+- SSID, BSSID, security mode, channel, band, RSSI, link rate, and any other
+  parameters the operating system exposes;
+- IP addresses, subnet, gateway, DNS, proxy, and signs of an active VPN;
+- device discovery via ARP, dynamic DNS-SD/mDNS enumeration, SSDP/UPnP, ONVIF,
+  and bounded TCP checks — strictly within the current local subnet;
+- one card per device that merges IP, MAC, vendor, local names, services,
+  ports, and observations;
+- offline vendor lookup from a bundled snapshot of the public IEEE MA-L, MA-M,
+  and MA-S registries — MAC addresses never leave the computer;
+- simple trust labels — *mine*, *known*, *ignore* — plus notifications about
+  new devices;
+- separate scores for network risk, observation coverage, and confidence;
+- per-network local history and background monitoring;
+- automatic checks for signed updates, with confirmation before installing
+  and restarting;
+- an explicit distinction between a *confirmed* and a *possible* camera;
+- English and Russian interface that follows the system language or can be
+  switched in settings;
+- an animated mascot — Ferris the crab — that reacts to the scan state.
 
-Радар в интерфейсе — визуализация процесса обнаружения. Радиус означает
-уверенность в классификации устройства, а не физическое расстояние до него.
+![List of visible devices](docs/images/devices-en.png)
 
-## Поддерживаемые платформы
+Device names appear only when the network or the device itself announces them
+via local DNS, Bonjour/mDNS, SSDP, or SMB. Mayak first enumerates the available
+DNS-SD service types and then resolves the services it finds along with their
+TXT metadata, so it is not limited to a short list of known protocols. When no
+reliable name is available, it shows the vendor, the observed addresses, and
+its confidence level instead of making up a specific model or device type.
 
-| Платформа | Архитектура | Минимальная версия | Готовые пакеты | Системная интеграция |
+## Honest limitations
+
+Mayak shows only what this computer can actually observe. Hotel client
+isolation, separate VLANs, multicast filtering, sleeping devices, firewalls,
+and MAC randomization can hide neighbors or change their identity. Not finding
+a camera does not prove there is no camera in the room or on the network.
+
+The radar in the interface visualizes the discovery process. Its radius
+represents classification confidence, not the physical distance to a device.
+
+## Supported platforms
+
+| Platform | Architecture | Minimum version | Packages | System integration |
 | --- | --- | --- | --- | --- |
-| macOS | Apple Silicon, arm64 | macOS 15 | DMG | CoreWLAN, CoreLocation, системные маршруты и ARP |
-| Windows | x64 | Windows 10/11 | NSIS setup.exe, MSI | Native Wi-Fi, IP Helper, Winsock |
+| macOS | Apple Silicon (arm64) | macOS 15 | DMG | CoreWLAN, CoreLocation, system routes and ARP |
+| Windows | x64 | Windows 10 / 11 | NSIS `setup.exe`, MSI | Native Wi‑Fi, IP Helper, Winsock |
 
-Обнаружение устройств, история, доверие, оценка риска, мониторинг и интерфейс
-одинаковы на обеих платформах. Набор низкоуровневых Wi‑Fi-метрик может
-различаться: например, Windows не всегда предоставляет шум, код страны или
-ширину канала. Маяк явно показывает «не определено», а не подставляет значение.
-Подробная матрица — в [документе о поддержке платформ](docs/PLATFORMS.md).
+Device discovery, history, trust labels, risk scoring, monitoring, and the
+interface are the same on both platforms. The set of low-level Wi‑Fi metrics
+can differ: for example, Windows does not always expose noise, country code,
+or channel width. In that case Mayak shows "unknown" rather than guessing. See
+the [platform support matrix](docs/PLATFORMS.md) for details.
 
-## Установка
+## Installation
 
-Проект публикуется как open-source beta для Apple Silicon/macOS 15+ и
-64-битных Windows 10/11. Текущий выпуск —
+Mayak is published as an open-source beta for Apple Silicon Macs running
+macOS 15+ and 64-bit Windows 10/11. The current release is
 [v0.2.0](https://github.com/alxshmrv/mayak/releases/tag/v0.2.0):
 
 - [Mayak-0.2.0-macos-arm64.dmg](https://github.com/alxshmrv/mayak/releases/download/v0.2.0/Mayak-0.2.0-macos-arm64.dmg)
-  — Mac с Apple Silicon;
+  — Apple Silicon Mac;
 - [Mayak-0.2.0-windows-x64-setup.exe](https://github.com/alxshmrv/mayak/releases/download/v0.2.0/Mayak-0.2.0-windows-x64-setup.exe)
-  — рекомендуемый установщик Windows;
+  — recommended Windows installer;
 - [Mayak-0.2.0-windows-x64.msi](https://github.com/alxshmrv/mayak/releases/download/v0.2.0/Mayak-0.2.0-windows-x64.msi)
-  — MSI для ручного или корпоративного развёртывания.
+  — MSI for manual or managed deployment.
 
-Публичные beta-сборки пока не подписаны сертификатами Apple и Microsoft:
-macOS Gatekeeper или Windows SmartScreen могут показать предупреждение.
-Проверяйте SHA-256 рядом с установщиком и загружайте файлы только из Releases
-этого репозитория. Пошаговая установка, проверка SHA-256 и удаление описаны в
-[инструкции по установке](docs/INSTALLATION.md).
+Public beta builds are not yet signed with Apple or Microsoft certificates, so
+macOS Gatekeeper or Windows SmartScreen may show a warning. Verify the SHA-256
+checksum published next to each installer, and download files only from this
+repository's Releases. Step-by-step installation, checksum verification, and
+removal are covered in the [installation guide](docs/INSTALLATION.md).
 
-GitHub автоматически добавляет к каждому релизу архивы `Source code`. Для
-обычной установки они не нужны — выбирайте DMG, setup.exe или MSI.
+GitHub automatically attaches `Source code` archives to every release. You do
+not need them for a regular install — pick the DMG, `setup.exe`, or MSI.
 
-Начиная с версии 0.3.0 Маяк сам проверяет новый публичный релиз при запуске и
-затем не чаще одного раза в шесть часов. Обновление загружается и
-устанавливается только после подтверждения пользователя. Каждый пакет
-проверяется по встроенному публичному ключу проекта; неподписанный или
-изменённый файл не будет установлен.
+Starting with version 0.3.0, Mayak checks for a new public release at launch
+and then at most once every six hours. Updates are downloaded and installed
+only after you confirm. Every package is verified against the project's
+embedded public key; an unsigned or modified file is never installed.
 
-## Сборка из исходников
+## Building from source
 
-Нужны Rust 1.88+, Node.js 22.12+ и системные инструменты разработки целевой
-платформы:
+You need Rust 1.88+, Node.js 22.12+, and the native development tools for your
+target platform:
 
 ```bash
 git clone https://github.com/alxshmrv/mayak.git
@@ -114,10 +138,10 @@ npm ci
 npm run tauri build
 ```
 
-На macOS будет собран DMG, на Windows — NSIS setup.exe и MSI. Результат
-появится в `src-tauri/target/release/bundle/`.
+macOS produces a DMG; Windows produces an NSIS `setup.exe` and an MSI. The
+output lands in `src-tauri/target/release/bundle/`.
 
-## Разработка
+## Development
 
 ```bash
 npm ci
@@ -128,65 +152,68 @@ cargo test --manifest-path src-tauri/Cargo.toml --all-targets
 npm run tauri dev
 ```
 
-GitHub Actions выполняет основные проверки отдельно на macOS и Windows, а при
-публикации тега собирает DMG, NSIS setup.exe и MSI, подписывает updater-пакеты
-и проверяет манифест до публикации. Правила работы с проектом описаны в
-[CONTRIBUTING.md](CONTRIBUTING.md).
+GitHub Actions runs the main checks separately on macOS and Windows. When a
+release tag is pushed, it builds the DMG, NSIS `setup.exe`, and MSI, signs the
+updater packages, and validates the manifest before publishing. Project
+guidelines are in [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## Приватность и системные разрешения
+## Privacy and system permissions
 
-Все результаты хранятся локально в SQLite внутри стандартного каталога данных
-приложения (`Application Support` на macOS или `%APPDATA%` на Windows). Маяк
-не содержит телеметрии, аналитики, рекламных SDK или облачного API. Для
-обновлений приложение обращается только к публичному GitHub Releases и не
-добавляет к запросу сведения о сети или устройствах. Подробности — в
-[PRIVACY.md](PRIVACY.md).
+All results are stored locally in SQLite inside the app's standard data
+directory (`Application Support` on macOS, `%APPDATA%` on Windows). Mayak
+contains no telemetry, analytics, ad SDKs, or cloud API. For updates it only
+contacts the public GitHub Releases and never adds network or device details
+to the request. Details are in [PRIVACY.md](PRIVACY.md).
 
-- **Геопозиция** необязательна и нужна системным Wi‑Fi API macOS и современных
-  версий Windows только для раскрытия SSID/BSSID. Географические координаты
-  приложение не получает и не сохраняет.
-- **Локальная сеть** нужна для обнаружения соседних устройств.
-- **Уведомления** запрашиваются только после включения соответствующих
-  переключателей в настройках.
+- **Location** is optional. macOS and recent Windows versions gate SSID/BSSID
+  access behind this permission; Mayak never receives or stores geographic
+  coordinates.
+- **Local network** access is required to discover nearby devices.
+- **Notifications** are requested only after you enable the corresponding
+  toggles in settings.
 
-## Архитектура
+## Architecture
 
 ```text
 React UI
-  └─ типизированные Tauri-команды и события
-      ├─ платформенный слой
-      │   ├─ macOS: CoreWLAN/CoreLocation + системные утилиты
+  └─ typed Tauri commands and events
+      ├─ platform layer
+      │   ├─ macOS: CoreWLAN / CoreLocation + system utilities
       │   └─ Windows: Native Wi-Fi + IP Helper + Winsock
-      ├─ движок обнаружения (ARP, DNS-SD/mDNS, SSDP, ONVIF, bounded TCP)
-      ├─ локальный IEEE OUI + fingerprinting + объяснимая оценка риска
-      ├─ SQLite: история, доверие к устройствам и настройки
-      └─ Tauri Updater: HTTPS-манифест + обязательная minisign-подпись
+      ├─ discovery engine (ARP, DNS-SD/mDNS, SSDP, ONVIF, bounded TCP)
+      ├─ local IEEE OUI + fingerprinting + explainable risk scoring
+      ├─ SQLite: history, device trust, and settings
+      └─ Tauri Updater: HTTPS manifest + mandatory minisign signature
 ```
 
-Сканер ограничивает число одновременных соединений, привязывает multicast и
-ONVIF-сокеты к Wi‑Fi-интерфейсу и не выходит за границы текущей локальной
-подсети.
+The scanner caps the number of concurrent connections, binds multicast and
+ONVIF sockets to the Wi‑Fi interface, and never leaves the boundaries of the
+current local subnet.
 
-## Документация
+## Documentation
 
-- [Установка и удаление](docs/INSTALLATION.md)
-- [Поддержка и различия платформ](docs/PLATFORMS.md)
-- [Выпуск релиза и ключ обновлений](docs/RELEASING.md)
-- [Продуктовые принципы](PRODUCT.md)
-- [Дизайн-система](DESIGN.md)
-- [Приватность](PRIVACY.md)
-- [Политика безопасности](SECURITY.md)
-- [Участие в разработке](CONTRIBUTING.md)
-- [История изменений](CHANGELOG.md)
+The supporting documents below are currently written in Russian.
 
-## Безопасность и участие
+- [Installation and removal](docs/INSTALLATION.md)
+- [Platform support and differences](docs/PLATFORMS.md)
+- [Releasing and the update key](docs/RELEASING.md)
+- [Product principles](PRODUCT.md)
+- [Design system](DESIGN.md)
+- [Privacy](PRIVACY.md)
+- [Security policy](SECURITY.md)
+- [Contributing](CONTRIBUTING.md)
+- [Changelog](CHANGELOG.md)
 
-Уязвимость не следует публиковать в обычном issue — используйте приватный
-канал из [SECURITY.md](SECURITY.md). Идеи и исправления приветствуются:
-[CONTRIBUTING.md](CONTRIBUTING.md), [кодекс поведения](CODE_OF_CONDUCT.md).
+## Security and contributing
 
-## Лицензия
+Please do not report vulnerabilities in public issues — use the private
+channel described in [SECURITY.md](SECURITY.md). Ideas and fixes are welcome:
+see [CONTRIBUTING.md](CONTRIBUTING.md) and the
+[Code of Conduct](CODE_OF_CONDUCT.md). When filing issues, replace real SSIDs,
+BSSIDs, IP and MAC addresses, and device names with placeholders.
 
-Исходный код и оригинальные визуальные материалы проекта распространяются по
-лицензии [MIT](LICENSE). Сторонние компоненты сохраняют собственные лицензии;
-см. [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) и lock-файлы.
+## License
+
+The source code and original visual assets are released under the
+[MIT License](LICENSE). Third-party components keep their own licenses; see
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and the lock files.
