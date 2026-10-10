@@ -1,1 +1,1 @@
-{"default":{"identifier":"default","description":"Минимальные разрешения главного окна Маяка","local":true,"windows":["main"],"permissions":["core:default"]}}
+{"default":{"identifier":"default","description":"Минимальные разрешения главного окна Маяка","local":true,"windows":["main"],"permissions":["core:default","updater:default","process:allow-restart"]}}

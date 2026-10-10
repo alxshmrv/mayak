@@ -608,6 +608,17 @@ svg { width: 18px; height: 18px; stroke-width: 1.8; }
   align-items: center; color: var(--green); font-size: 10px; font-weight: 700;
 }
 .permission-ok svg { width: 13px; }
+.update-status {
+  display: flex; gap: 9px; align-items: flex-start; padding: 11px 17px;
+  color: var(--ink-soft); background: color-mix(in srgb, var(--surface-subtle) 55%, transparent);
+  border-top: 1px solid var(--line);
+}
+.update-status > svg { width: 15px; height: 15px; flex: 0 0 auto; color: var(--green); }
+.update-status > span { display: flex; min-width: 0; flex-direction: column; }
+.update-status strong { font-size: 10px; font-weight: 650; }
+.update-status small { margin-top: 2px; color: var(--ink-faint); font-size: 9px; }
+.update-status--failed > svg, .update-status--failed strong { color: var(--red); }
+.update-status--available > svg, .update-status--available strong { color: var(--iris); }
 .primary-button, .secondary-button {
   display: inline-flex; gap: 7px; align-items: center; justify-content: center;
   padding: 9px 13px; font-size: 11px; font-weight: 700; border-radius: 10px; cursor: pointer;
@@ -680,6 +691,31 @@ svg { width: 18px; height: 18px; stroke-width: 1.8; }
 .modal__facts span { display: flex; gap: 7px; align-items: center; font-size: 10px; }
 .modal__facts svg { width: 13px; color: var(--green); }
 .modal__actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
+.update-modal { width: min(500px, 100%); }
+.update-notes {
+  max-height: 145px; padding: 12px; margin-top: 16px; overflow: auto;
+  background: var(--surface-subtle); border: 1px solid var(--line); border-radius: 11px;
+}
+.update-notes p {
+  margin-top: 7px; color: var(--ink-soft); font-size: 10px; white-space: pre-wrap;
+  user-select: text;
+}
+.update-progress { margin-top: 16px; }
+.update-progress > div {
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 7px;
+  color: var(--ink-soft); font-size: 10px; font-weight: 650;
+}
+.update-progress small { color: var(--ink-faint); font-weight: 400; }
+.update-progress progress {
+  width: 100%; height: 7px; overflow: hidden; appearance: none;
+  background: var(--surface-subtle); border: 0; border-radius: 999px;
+}
+.update-progress progress::-webkit-progress-bar { background: var(--surface-subtle); }
+.update-progress progress::-webkit-progress-value { background: var(--iris); border-radius: 999px; }
+.update-error {
+  padding: 10px 12px; margin-top: 13px !important; color: var(--red) !important;
+  background: var(--red-soft); border-radius: 10px;
+}
 .toast {
   position: fixed; right: 20px; bottom: 20px; z-index: 120; display: flex; gap: 9px;
   align-items: center; padding: 10px 12px; background: var(--surface-solid);

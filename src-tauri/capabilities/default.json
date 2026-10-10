@@ -3,5 +3,9 @@
   "identifier": "default",
   "description": "Минимальные разрешения главного окна Маяка",
   "windows": ["main"],
-  "permissions": ["core:default"]
+  "permissions": [
+    "core:default",
+    "updater:default",
+    "process:allow-restart"
+  ]
 }
